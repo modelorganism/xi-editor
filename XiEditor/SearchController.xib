@@ -18,64 +18,96 @@
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <window title="Find" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" oneShot="NO" releasedWhenClosed="NO" animationBehavior="default" id="QvC-M9-y7g">
-            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
+        <window title="Find " allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" hidesOnDeactivate="YES" oneShot="NO" releasedWhenClosed="NO" showsToolbarButton="NO" animationBehavior="default" id="QvC-M9-y7g">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES" resizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
             <rect key="contentRect" x="196" y="240" width="660" height="148"/>
             <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1177"/>
             <view key="contentView" wantsLayer="YES" id="EiT-Mj-1SZ">
                 <rect key="frame" x="0.0" y="0.0" width="660" height="148"/>
-                <autoresizingMask key="autoresizingMask"/>
+                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
                     <stackView distribution="fill" orientation="horizontal" alignment="top" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="FRO-mO-zhn">
                         <rect key="frame" x="20" y="20" width="620" height="108"/>
                         <subviews>
-                            <stackView distribution="fill" orientation="vertical" alignment="leading" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" horizontalCompressionResistancePriority="1000" verticalCompressionResistancePriority="1000" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="lEz-Sf-vW5">
-                                <rect key="frame" x="0.0" y="50" width="99" height="58"/>
+                            <stackView distribution="fill" orientation="vertical" alignment="leading" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="AKc-tw-4Ki">
+                                <rect key="frame" x="0.0" y="25" width="99" height="83"/>
                                 <subviews>
-                                    <button horizontalCompressionResistancePriority="1000" verticalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="gL3-NU-8nB">
-                                        <rect key="frame" x="-2" y="42" width="68" height="18"/>
-                                        <buttonCell key="cell" type="check" title="RegExp" bezelStyle="regularSquare" imagePosition="left" enabled="NO" inset="2" id="kvq-CQ-l1g">
-                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                    <stackView distribution="fill" orientation="vertical" alignment="leading" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" horizontalCompressionResistancePriority="1000" verticalCompressionResistancePriority="1000" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="lEz-Sf-vW5">
+                                        <rect key="frame" x="0.0" y="25" width="99" height="58"/>
+                                        <subviews>
+                                            <button horizontalCompressionResistancePriority="1000" verticalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="gL3-NU-8nB">
+                                                <rect key="frame" x="-2" y="42" width="68" height="18"/>
+                                                <buttonCell key="cell" type="check" title="RegExp" bezelStyle="regularSquare" imagePosition="left" enabled="NO" inset="2" id="kvq-CQ-l1g">
+                                                    <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                    <font key="font" metaFont="system"/>
+                                                </buttonCell>
+                                                <connections>
+                                                    <binding destination="-2" name="value" keyPath="self.searchData.regExp" id="Elc-xP-b1P"/>
+                                                </connections>
+                                            </button>
+                                            <button horizontalCompressionResistancePriority="1000" verticalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="myL-1b-OBi">
+                                                <rect key="frame" x="-2" y="20" width="94" height="18"/>
+                                                <buttonCell key="cell" type="check" title="Match Case" bezelStyle="regularSquare" imagePosition="left" enabled="NO" inset="2" id="SgK-Xf-8AY">
+                                                    <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                    <font key="font" metaFont="system"/>
+                                                </buttonCell>
+                                                <connections>
+                                                    <binding destination="-2" name="value" keyPath="self.searchData.matchCase" id="tg6-O2-g3E"/>
+                                                </connections>
+                                            </button>
+                                            <button verticalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="EfA-8T-MKm">
+                                                <rect key="frame" x="-2" y="-2" width="103" height="18"/>
+                                                <buttonCell key="cell" type="check" title="Whole Words" bezelStyle="regularSquare" imagePosition="left" enabled="NO" inset="2" id="Huw-hc-yB5">
+                                                    <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                                                    <font key="font" metaFont="system"/>
+                                                </buttonCell>
+                                                <connections>
+                                                    <binding destination="-2" name="value" keyPath="self.searchData.wholeWord" id="nUm-0E-keT"/>
+                                                </connections>
+                                            </button>
+                                        </subviews>
+                                        <constraints>
+                                            <constraint firstItem="myL-1b-OBi" firstAttribute="top" secondItem="gL3-NU-8nB" secondAttribute="bottom" constant="8" id="49R-dT-6hl"/>
+                                            <constraint firstAttribute="width" constant="99" id="7dl-fl-36j"/>
+                                            <constraint firstAttribute="height" constant="58" id="ox0-dc-xbC"/>
+                                        </constraints>
+                                        <visibilityPriorities>
+                                            <integer value="1000"/>
+                                            <integer value="1000"/>
+                                            <integer value="1000"/>
+                                        </visibilityPriorities>
+                                        <customSpacing>
+                                            <real value="3.4028234663852886e+38"/>
+                                            <real value="3.4028234663852886e+38"/>
+                                            <real value="3.4028234663852886e+38"/>
+                                        </customSpacing>
+                                    </stackView>
+                                    <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="wZd-YL-ZyU">
+                                        <rect key="frame" x="-2" y="0.0" width="103" height="17"/>
+                                        <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" sendsActionOnEndEditing="YES" alignment="right" title="Bad Grep!" id="iwY-c2-n15">
                                             <font key="font" metaFont="system"/>
-                                        </buttonCell>
+                                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                        </textFieldCell>
                                         <connections>
-                                            <binding destination="-2" name="value" keyPath="self.searchData.regExp" id="Elc-xP-b1P"/>
+                                            <binding destination="-2" name="hidden" keyPath="self.searchData.isError" id="Utx-k9-Wnb">
+                                                <dictionary key="options">
+                                                    <string key="NSValueTransformerName">NSNegateBoolean</string>
+                                                </dictionary>
+                                            </binding>
                                         </connections>
-                                    </button>
-                                    <button horizontalCompressionResistancePriority="1000" verticalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="myL-1b-OBi">
-                                        <rect key="frame" x="-2" y="20" width="94" height="18"/>
-                                        <buttonCell key="cell" type="check" title="Match Case" bezelStyle="regularSquare" imagePosition="left" enabled="NO" inset="2" id="SgK-Xf-8AY">
-                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                                            <font key="font" metaFont="system"/>
-                                        </buttonCell>
-                                        <connections>
-                                            <binding destination="-2" name="value" keyPath="self.searchData.matchCase" id="tg6-O2-g3E"/>
-                                        </connections>
-                                    </button>
-                                    <button verticalCompressionResistancePriority="1000" translatesAutoresizingMaskIntoConstraints="NO" id="EfA-8T-MKm">
-                                        <rect key="frame" x="-2" y="-2" width="103" height="18"/>
-                                        <buttonCell key="cell" type="check" title="Whole Words" bezelStyle="regularSquare" imagePosition="left" enabled="NO" inset="2" id="Huw-hc-yB5">
-                                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
-                                            <font key="font" metaFont="system"/>
-                                        </buttonCell>
-                                        <connections>
-                                            <binding destination="-2" name="value" keyPath="self.searchData.wholeWord" id="nUm-0E-keT"/>
-                                        </connections>
-                                    </button>
+                                    </textField>
                                 </subviews>
                                 <constraints>
-                                    <constraint firstItem="myL-1b-OBi" firstAttribute="top" secondItem="gL3-NU-8nB" secondAttribute="bottom" constant="8" id="49R-dT-6hl"/>
-                                    <constraint firstAttribute="width" constant="99" id="7dl-fl-36j"/>
-                                    <constraint firstAttribute="height" constant="58" id="ox0-dc-xbC"/>
+                                    <constraint firstAttribute="trailing" secondItem="wZd-YL-ZyU" secondAttribute="trailing" id="17r-bQ-dek"/>
+                                    <constraint firstAttribute="bottom" secondItem="wZd-YL-ZyU" secondAttribute="bottom" id="Lq1-Lh-vlf"/>
                                 </constraints>
                                 <visibilityPriorities>
                                     <integer value="1000"/>
                                     <integer value="1000"/>
-                                    <integer value="1000"/>
                                 </visibilityPriorities>
                                 <customSpacing>
-                                    <real value="3.4028234663852886e+38"/>
                                     <real value="3.4028234663852886e+38"/>
                                     <real value="3.4028234663852886e+38"/>
                                 </customSpacing>
@@ -88,6 +120,7 @@
                                     <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                                 </textFieldCell>
                                 <connections>
+                                    <action selector="textAction:" target="-2" id="teb-00-TnN"/>
                                     <binding destination="-2" name="value" keyPath="self.searchData.text" id="I5H-4W-OIO">
                                         <dictionary key="options">
                                             <bool key="NSContinuouslyUpdatesValue" value="YES"/>
@@ -95,22 +128,42 @@
                                     </binding>
                                 </connections>
                             </textField>
-                            <button verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="TYA-23-7jS">
-                                <rect key="frame" x="557" y="80" width="69" height="32"/>
-                                <buttonCell key="cell" type="push" title="Next" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="QtD-2z-86q">
-                                    <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                                    <font key="font" metaFont="system"/>
-                                </buttonCell>
-                                <connections>
-                                    <action selector="findNext:" target="-2" id="Imo-9R-yTt"/>
-                                </connections>
-                            </button>
+                            <stackView distribution="fill" orientation="vertical" alignment="leading" horizontalStackHuggingPriority="249.99998474121094" verticalStackHuggingPriority="249.99998474121094" detachesHiddenViews="YES" translatesAutoresizingMaskIntoConstraints="NO" id="DdN-yB-7hb">
+                                <rect key="frame" x="563" y="58" width="57" height="50"/>
+                                <subviews>
+                                    <button verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="VKY-9f-X87" userLabel="Prev">
+                                        <rect key="frame" x="-6" y="22" width="68" height="32"/>
+                                        <buttonCell key="cell" type="push" title="Prev" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="9sq-XR-rA7">
+                                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                                            <font key="font" metaFont="system"/>
+                                        </buttonCell>
+                                        <connections>
+                                            <action selector="findPrev:" target="-2" id="2RE-ED-VeD"/>
+                                        </connections>
+                                    </button>
+                                    <button verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="TYA-23-7jS">
+                                        <rect key="frame" x="-6" y="-7" width="69" height="32"/>
+                                        <buttonCell key="cell" type="push" title="Next" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="QtD-2z-86q">
+                                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                                            <font key="font" metaFont="system"/>
+                                        </buttonCell>
+                                        <connections>
+                                            <action selector="findNext:" target="-2" id="YeV-56-7WK"/>
+                                        </connections>
+                                    </button>
+                                </subviews>
+                                <visibilityPriorities>
+                                    <integer value="1000"/>
+                                    <integer value="1000"/>
+                                </visibilityPriorities>
+                                <customSpacing>
+                                    <real value="3.4028234663852886e+38"/>
+                                    <real value="3.4028234663852886e+38"/>
+                                </customSpacing>
+                            </stackView>
                         </subviews>
                         <constraints>
                             <constraint firstAttribute="bottom" secondItem="7Ea-qz-Wiq" secondAttribute="bottom" id="FBA-Sv-8bp"/>
-                            <constraint firstItem="TYA-23-7jS" firstAttribute="leading" secondItem="7Ea-qz-Wiq" secondAttribute="trailing" constant="8" id="GfO-MW-RAd"/>
-                            <constraint firstItem="7Ea-qz-Wiq" firstAttribute="leading" secondItem="lEz-Sf-vW5" secondAttribute="trailing" constant="8" id="MRX-kW-zQo"/>
-                            <constraint firstItem="TYA-23-7jS" firstAttribute="leading" secondItem="7Ea-qz-Wiq" secondAttribute="trailing" constant="8" id="Ras-iS-y22"/>
                         </constraints>
                         <visibilityPriorities>
                             <integer value="1000"/>

@@ -95,7 +95,10 @@ pub enum EditCommand<'a> {
     DebugRewrap,
     DebugTestFgSpans,
     DebugRunPlugin,
-    Search { text: &'a str }
+    Search { text: &'a str, flags: u64  },
+    UpdateSearch { text: &'a str, flags: u64 },
+    FindNext,
+    FindPrev
 }
 
 impl<'a> TabCommand<'a> {
@@ -232,9 +235,23 @@ impl<'a> EditCommand<'a> {
             "debug_run_plugin" => Ok(DebugRunPlugin),
 
             "search" => params.as_object().and_then(|dict| {
-                dict_get_string(dict, "text").map(|text| Search { text: text })
+                dict_get_string(dict, "text").and_then(|chars| {
+                    dict_get_u64(dict, "flags").map(|flags| {
+                        Search { text: chars, flags: flags }
+                    })
+                })
             }).ok_or_else(|| MalformedEditParams(method.to_string(), params.clone())),
 
+            "update_search" => params.as_object().and_then(|dict| {
+                dict_get_string(dict, "text").and_then(|chars| {
+                    dict_get_u64(dict, "flags").map(|flags| {
+                        UpdateSearch { text: chars, flags: flags }
+                    })
+                })
+            }).ok_or_else(|| MalformedEditParams(method.to_string(), params.clone())),
+
+            "find_next" => Ok(FindNext),
+            "find_prev" => Ok(FindPrev),
 
             _ => Err(UnknownEditMethod(method.to_string())),
         }

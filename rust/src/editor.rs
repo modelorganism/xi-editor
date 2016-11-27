@@ -25,20 +25,20 @@ use xi_rope::interval::Interval;
 use xi_rope::delta::{Delta, Transformer};
 use xi_rope::tree::Cursor;
 use xi_rope::engine::Engine;
-use xi_rope::spans::SpansBuilder;
+use xi_rope::spans::{Spans, SpansBuilder};
 use view::{Style, View};
 
 use tabs::TabCtx;
 use rpc::EditCommand;
 use run_plugin::{start_plugin, PluginRef};
 
+use search::{SearchOpts, SearchState, search_all, search_1};
+
 const FLAG_SELECT: u64 = 2;
 
 const MAX_UNDOS: usize = 20;
 
 const TAB_SIZE: usize = 4;
-
-const FLAG_FIND_REV: u64 = 1;
 
 // Maximum returned result from plugin get_data RPC.
 const MAX_SIZE_LIMIT: usize = 1024 * 1024;
@@ -693,31 +693,83 @@ impl Editor {
     /// Move the selection to the next occurance of <findStr>.
     fn do_search(&mut self, find_str: &str, flags: u64) {
         // Only basic, forward search actualy works.
-        let (start, end) =  if (flags & FLAG_FIND_REV) == 0 {
-            (self.view.sel_end,self.text.len())
-        }
-        else {
-            (0, self.view.sel_start)
-        };
-        let mut new_sel = None;
-        let mut curr_loc = start;
-        for line in self.text.lines(start, end) {
-            match line.find(find_str)  {
-                Some(match_start) => {
-                    new_sel = Some(curr_loc+match_start);
-                    break
-                },
-                None => {
-                    curr_loc += line.len()+1
-                }
-            }
-        }
-        if let Some(new_sel) = new_sel {
-            self.set_cursor(new_sel, true);
+        let (start, end) = (self.view.sel_end,self.text.len());
+
+        if let Some((new_sel_start,new_sel_end))
+            = search_1(find_str, flags, &self.text, start, end) {
+
+            self.set_cursor(new_sel_start, true);
             self.modify_selection();
-            self.set_cursor(new_sel+find_str.len(), true);
+            self.set_cursor(new_sel_end, true);
         }
     }
+
+    fn update_search(&mut self, find_str: &str, flags: u64) -> Value {
+
+
+        let opt = SearchOpts::from_flags(flags);
+
+        let search_state = SearchState::from_str_and_opts(find_str,  opt);
+
+        let is_err = search_state.is_err();
+
+        let s = search_state.maybe_search();
+
+        self.tab_ctx.set_search(search_state);
+
+        if is_err {
+            return Value::String(String::from("err"))
+        }
+
+        let found_spans =
+            if let Some(s) = s {
+                search_all(&s, &self.text)
+            }
+            else {
+                Spans::default()
+            };
+
+        self.view.set_find_spans(0, self.text.len(), found_spans);
+        self.view_dirty = true;
+        self.render();
+
+        Value::String(String::from("ok"))
+    }
+
+    fn sel_find_forward(&mut self) {
+        let mut new_sel = None;
+        for (i, _) in self.view.find_spans.iter() {
+            if i.is_after(self.view.sel_end) {
+                new_sel = Some((i.start(), i.end()));
+                print_err!("Found: {:?}", new_sel);
+                break
+
+            }
+        }
+        if let Some((new_sel_start, new_sel_end)) = new_sel {
+            self.set_cursor(new_sel_start, true);
+            self.modify_selection();
+            self.set_cursor(new_sel_end, true);
+        }
+    }
+
+    fn sel_find_backward(&mut self) {
+        let mut new_sel = None;
+        for (i, _) in self.view.find_spans.iter() {
+            if i.is_before(self.view.sel_start) {
+                new_sel = Some((i.start(), i.end()));
+            }
+            else {
+                break
+            }
+        }
+        if let Some((new_sel_start, new_sel_end)) = new_sel {
+            self.set_cursor(new_sel_start, true);
+            self.modify_selection();
+            self.set_cursor(new_sel_end, true);
+        }
+    }
+
 
     fn delete_to_end_of_paragraph(&mut self) {
         let current = self.view.sel_max();
@@ -807,7 +859,10 @@ impl Editor {
             DebugRewrap => async(self.debug_rewrap()),
             DebugTestFgSpans => async(self.debug_test_fg_spans()),
             DebugRunPlugin => async(self.debug_run_plugin(self_ref)),
-            Search { text } => async(self.do_search(text, 0)),
+            Search { text, flags } => async(self.do_search(text, flags)),
+            UpdateSearch { text, flags } => Some(self.update_search(text, flags)),
+            FindNext => async(self.sel_find_forward()),
+            FindPrev => async(self.sel_find_backward()),
         };
 
         // TODO: could defer this until input quiesces - will this help?

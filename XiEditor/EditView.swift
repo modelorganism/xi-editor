@@ -14,15 +14,9 @@
 
 import Cocoa
 
-func eventToJson(event: NSEvent) -> AnyObject {
+func eventToComponents(event: NSEvent) -> (Int, String, UInt) {
     let flags = event.modifierFlags.rawValue >> 16;
-    return ["keycode": Int(event.keyCode),
-        "chars": event.characters!,
-        "flags": flags]
-}
-
-func insertedStringToJson(stringToInsert: NSString) -> AnyObject {
-    return ["chars": stringToInsert]
+    return (Int(event.keyCode), event.characters!, flags)
 }
 
 // compute the width if monospaced, 0 otherwise
@@ -63,15 +57,14 @@ func camelCaseToUnderscored(name: NSString) -> NSString {
 }
 
 class EditView: NSView, NSTextInputClient {
-    var tabName: String?
-    var coreConnection: CoreConnection?
+    var document: Document!
 
     // basically a cache of lines, indexed by line number
     var lineMap: [Int: [AnyObject]] = [:]
     var height: Int = 0
 
     var widthConstraint: NSLayoutConstraint?
-    var heightConstraint: NSLayoutConstraint?
+    @IBOutlet var heightConstraint: NSLayoutConstraint?
 
     var attributes: [String: AnyObject]
     var ascent: CGFloat
@@ -81,7 +74,8 @@ class EditView: NSView, NSTextInputClient {
     var linespace: CGFloat
     var fontWidth: CGFloat
 
-    let selcolor: NSColor
+    let fgSelcolor: NSColor
+    let bgSelcolor: NSColor
 
     // visible scroll region, exclusive of lastLine
     var firstLine: Int = 0
@@ -101,7 +95,12 @@ class EditView: NSView, NSTextInputClient {
     var _selectedRange: NSRange
     var _markedRange: NSRange
     
-    var frameRect: NSRect
+    //var frameRect: NSRect
+    
+    var isFrontmost: Bool // Are we frontmost, the view that gets keyboard input?
+    
+    var cursorFlashOn: Bool
+    var blinkTimer : NSTimer?
 
     override init(frame frameRect: NSRect) {
         let font = CTFontCreateWithName("InconsolataGo", 14, nil)
@@ -112,11 +111,16 @@ class EditView: NSView, NSTextInputClient {
         baseline = ceil(ascent)
         attributes = [String(kCTFontAttributeName): font]
         fontWidth = getFontWidth(font)
-        selcolor = NSColor(colorLiteralRed: 0.7, green: 0.85, blue: 0.99, alpha: 1.0)
+        fgSelcolor =  NSColor.selectedTextBackgroundColor()
+        bgSelcolor = NSColor(colorLiteralRed: 0.8, green: 0.8, blue: 0.8, alpha: 1.0) //Gray for the selected text background when not 'key'
         updateQueue = dispatch_queue_create("com.levien.xi.update", DISPATCH_QUEUE_SERIAL)
         _selectedRange = NSMakeRange(NSNotFound, 0)
         _markedRange = NSMakeRange(NSNotFound, 0)
-        self.frameRect = frameRect
+
+        //self.frameRect = frameRect
+        isFrontmost = false
+        cursorFlashOn = true
+
         super.init(frame: frameRect)
         widthConstraint = NSLayoutConstraint(item: self, attribute: .Width, relatedBy: .GreaterThanOrEqual, toItem: nil, attribute: .Width, multiplier: 1, constant: 400)
         widthConstraint!.active = true
@@ -139,21 +143,28 @@ class EditView: NSView, NSTextInputClient {
 
     override func resetCursorRects() {
         super.resetCursorRects()
-        addCursorRect(frameRect, cursor: NSCursor.IBeamCursor())
+        addCursorRect(frame, cursor: NSCursor.IBeamCursor())
     }
 
     required init?(coder: NSCoder) {
-        fatalError("View doesn't support NSCoding")
-    }
-
-    func sendRpcAsync(method: String, params: AnyObject) {
-        let inner = ["method": method, "params": params, "tab": tabName!] as [String : AnyObject]
-        coreConnection?.sendRpcAsync("edit", params: inner)
-    }
-
-    func sendRpc(method: String, params: AnyObject) -> AnyObject? {
-        let inner = ["method": method, "params": params, "tab": tabName!] as [String : AnyObject]
-        return coreConnection?.sendRpc("edit", params: inner)
+        let font = CTFontCreateWithName("InconsolataGo", 14, nil)
+        ascent = CTFontGetAscent(font)
+        descent = CTFontGetDescent(font)
+        leading = CTFontGetLeading(font)
+        linespace = ceil(ascent + descent + leading)
+        baseline = ceil(ascent)
+        attributes = [String(kCTFontAttributeName): font]
+        fontWidth = getFontWidth(font)
+        fgSelcolor =  NSColor.selectedTextBackgroundColor()
+        bgSelcolor = NSColor(colorLiteralRed: 0.8, green: 0.8, blue: 0.8, alpha: 1.0) //Gray for the selected text background when not 'key'
+        //selcolor = NSColor(colorLiteralRed: 0.7, green: 0.85, blue: 0.99, alpha: 1.0)
+        updateQueue = dispatch_queue_create("com.levien.xi.update", DISPATCH_QUEUE_SERIAL)
+        _selectedRange = NSMakeRange(NSNotFound, 0)
+        _markedRange = NSMakeRange(NSNotFound, 0)
+        
+        isFrontmost = false;
+        cursorFlashOn = false;
+        super.init(coder: coder)
     }
 
     func utf8_offset_to_utf16(s: String, _ ix: Int) -> Int {
@@ -209,7 +220,16 @@ class EditView: NSView, NSTextInputClient {
                     let u16_start = utf8_offset_to_utf16(s, start)
                     let end = attr[2] as! Int
                     let u16_end = utf8_offset_to_utf16(s, end)
-                    attrString.addAttribute(NSBackgroundColorAttributeName, value: selcolor, range: NSMakeRange(u16_start, u16_end - u16_start))
+                    attrString.addAttribute(NSBackgroundColorAttributeName, value: selcolor(), range: NSMakeRange(u16_start, u16_end - u16_start))
+                } else if type == "hit" {
+                    if isFrontmost {
+                        // Don't draw the find for background windows becasue we don't keep it up to date.
+                        let start = attr[1] as! Int
+                        let u16_start = utf8_offset_to_utf16(s, start)
+                        let end = attr[2] as! Int
+                        let u16_end = utf8_offset_to_utf16(s, end)
+                        attrString.addAttribute(NSBackgroundColorAttributeName, value:NSColor.yellowColor(), range: NSMakeRange(u16_start, u16_end - u16_start))
+                    }
                 } else if type == "fg" {
                     let start = attr[1] as! Int
                     let u16_start = utf8_offset_to_utf16(s, start)
@@ -273,7 +293,7 @@ class EditView: NSView, NSTextInputClient {
             //attrString.drawAtPoint(NSPoint(x: x0, y: y - 13))
             let y = linespace * CGFloat(lineIx + 1);
             attrString.drawWithRect(NSRect(x: x0, y: y, width: dirtyRect.origin.x + dirtyRect.width - x0, height: 14), options: [])
-            if let cursor = cursor {
+            if isFrontmost, let cursor = cursor {
                 let ctline = CTLineCreateWithAttributedString(attrString)
                 /*
                 CGContextSetTextMatrix(context, CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: x0, ty: y))
@@ -285,14 +305,14 @@ class EditView: NSView, NSTextInputClient {
                     let utf16_ix = utf8_offset_to_utf16(s, cursor)
                     pos = CTLineGetOffsetForStringIndex(ctline, CFIndex(utf16_ix), nil)
                 }
-                CGContextSetStrokeColorWithColor(context, CGColorCreateGenericGray(0, 1))
+                CGContextSetStrokeColorWithColor(context, cursorColor())
                 CGContextMoveToPoint(context, x0 + pos, y + descent)
                 CGContextAddLineToPoint(context, x0 + pos, y - ascent)
                 CGContextStrokePath(context)
             }
         }
     }
-
+    
     override var acceptsFirstResponder: Bool {
         return true;
     }
@@ -318,7 +338,7 @@ class EditView: NSView, NSTextInputClient {
 
     // NSResponder (used mostly for paste)
     override func insertText(insertString: AnyObject) {
-        sendRpcAsync("insert", params: insertedStringToJson(insertString as! NSString))
+        document.sendRPCActionAsync(.Insert(insertString as! NSString))
     }
 
     // NSTextInputClient protocol
@@ -359,12 +379,12 @@ class EditView: NSView, NSTextInputClient {
             replacementRange.length = 0
         }
         for _ in 0..<aRange.length {
-            sendRpcAsync("delete_backward", params  : [])
+            document.sendRPCActionAsync(.DeleteBackward)
         }
         if let attrStr = aString as? NSAttributedString {
-            sendRpcAsync("insert", params: insertedStringToJson(attrStr.string))
+            document.sendRPCActionAsync(.Insert(attrStr.string))
         } else if let str = aString as? NSString {
-            sendRpcAsync("insert", params: insertedStringToJson(str))
+            document.sendRPCActionAsync(.Insert(str))
         }
         return NSMakeRange(replacementRange.location, len)
     }
@@ -385,7 +405,7 @@ class EditView: NSView, NSTextInputClient {
     func removeMarkedText() {
         if (_markedRange.location != NSNotFound) {
             for _ in 0..<_markedRange.length {
-                sendRpcAsync("delete_backward", params: [])
+                document.sendRPCActionAsync(.DeleteBackward)
             }
         }
         _markedRange = NSMakeRange(NSNotFound, 0)
@@ -440,24 +460,22 @@ class EditView: NSView, NSTextInputClient {
         if (self.respondsToSelector(aSelector)) {
             super.doCommandBySelector(aSelector);
         } else {
-            let commandName = camelCaseToUnderscored(aSelector.description).stringByReplacingOccurrencesOfString(":", withString: "");
+            let commandName = camelCaseToUnderscored(aSelector.description).stringByReplacingOccurrencesOfString(":", withString: "")
             if (commandName == "noop") {
-                
-                // Obviously this seems wrong. I don't know where we should be heading this off.
-                if currentEvent?.characters == "f" {
-                    NSBeep()
-                }
-                else {
-                    sendRpcAsync("key", params: eventToJson(currentEvent!));
-                }
+                NSBeep()
+                //let components = eventToComponents(currentEvent!)
+                //document.sendRPCActionAsync(.Key(components.0, components.1, components.2))
+            }
+            else if (commandName == "delete_backward") {
+                document.sendRPCActionAsync(.DeleteBackward)
             } else {
-                sendRpcAsync(commandName, params: []);
+                document.sendRPCActionAsync(.Unknown(commandName))
             }
         }
     }
 
-    func cutCopy(method: String) {
-        let text = sendRpc(method, params: [])
+    func cutCopy(action: Action) {
+        let text = document.sendRPCAction(action)
         if let text = text as? String {
             let pasteboard = NSPasteboard.generalPasteboard()
             pasteboard.clearContents()
@@ -466,11 +484,11 @@ class EditView: NSView, NSTextInputClient {
     }
 
     func cut(sender: AnyObject?) {
-        cutCopy("cut")
+        cutCopy(.Cut)
     }
 
     func copy(sender: AnyObject?) {
-        cutCopy("copy")
+        cutCopy(.Copy)
     }
 
     func paste(sender: AnyObject?) {
@@ -486,11 +504,11 @@ class EditView: NSView, NSTextInputClient {
     }
 
     func undo(sender: AnyObject?) {
-        sendRpcAsync("undo", params: [])
+        document.sendRPCActionAsync(.Undo)
     }
 
     func redo(sender: AnyObject?) {
-        sendRpcAsync("redo", params: [])
+        document.sendRPCActionAsync(.Redo)
     }
 
     override func mouseDown(theEvent: NSEvent) {
@@ -500,7 +518,7 @@ class EditView: NSView, NSTextInputClient {
         lastDragLineCol = (line, col)
         let flags = theEvent.modifierFlags.rawValue >> 16
         let clickCount = theEvent.clickCount
-        sendRpcAsync("click", params: [line, col, flags, clickCount])
+        document.sendRPCActionAsync(.Click(line, col, flags, clickCount))
         timer = NSTimer.scheduledTimerWithTimeInterval(NSTimeInterval(1.0/60), target: self, selector: #selector(autoscrollTimer), userInfo: nil, repeats: true)
         timerEvent = theEvent
     }
@@ -511,7 +529,7 @@ class EditView: NSView, NSTextInputClient {
         if let last = lastDragLineCol where last != (line, col) {
             lastDragLineCol = (line, col)
             let flags = theEvent.modifierFlags.rawValue >> 16
-            sendRpcAsync("drag", params: [line, col, flags])
+            document.sendRPCActionAsync(.Drag(line, col, flags))
         }
         timerEvent = theEvent
     }
@@ -536,23 +554,19 @@ class EditView: NSView, NSTextInputClient {
         case NSTextFinderAction.ShowFindInterface:
             appDelegate.showSearch()
         case NSTextFinderAction.SetSearchString:
-            let text = sendRpc("copy", params: [])
+            let text = document.sendRPCAction(.Copy)
             if let text = text as? String {
                 appDelegate.setSearchString(text)
             }
         case NSTextFinderAction.NextMatch:
-            let text = appDelegate.getSearchString()
-            if text != "" {
-                findNext(text)
-            }
+            document.searchNext()
+        case NSTextFinderAction.PreviousMatch:
+            document.searchPrev()
         default: ()
         }
     }
     
-    func findNext(findString: String) {
-        sendRpcAsync("search", params: ["text": findString, "flags":0])
-    }
-    
+   
     //Newer version of above, not the message that is sent by the menus now.
     @objc override func performTextFinderAction(sender: AnyObject?){
         performFindPanelAction(sender)
@@ -609,7 +623,55 @@ class EditView: NSView, NSTextInputClient {
                 self.scrollRectToVisible(scrollRect)
             }
         }
+        if self.isFrontmost {
+            setInsertionBlink(true)
+        }
         needsDisplay = true
+    }
+    
+    /*  Insertion point blinking.
+        Only the frontmost ('key') window should have a blinking insertion point.
+        A new 'on' cycle starts every time the window is comes to the front, or the text changes, or the ins. point moves.
+        Type fast enough and the ins. point stays on.
+     */
+    
+    /// Turns the ins. point visible, and set it flashing. Dose nothing if window is not key.
+    func setInsertionBlink(on: Bool) {
+        // caller must set NeedsDisplay
+        cursorFlashOn = on
+        blinkTimer?.invalidate()
+        if on {
+            blinkTimer = NSTimer.scheduledTimerWithTimeInterval(NSTimeInterval(1.0), target: self, selector: #selector(blinkInsertionPoint), userInfo: nil, repeats: true)
+        }
+        else {
+            blinkTimer = nil
+        }
+    }
+    
+    // Just performs the actual blinking.
+    func blinkInsertionPoint() {
+        cursorFlashOn = !self.cursorFlashOn
+        needsDisplay = true
+    }
+    
+    // Current color for the ins. point. Implements flashing.
+    func cursorColor() -> CGColor {
+        if cursorFlashOn {
+            return CGColorCreateGenericGray(0, 1) // Black
+        }
+        else {
+            return CGColorCreateGenericGray(1, 1) // should match background.
+        }
+    }
+    
+    // Background color for selected text. Only the first responder of the key window should have a non-gray selection.
+    func selcolor() -> NSColor {
+        if isFrontmost {
+            return fgSelcolor
+        }
+        else {
+            return bgSelcolor
+        }
     }
 
     func tryUpdate() {
@@ -639,7 +701,7 @@ class EditView: NSView, NSTextInputClient {
         if first != firstLine || last != lastLine {
             firstLine = first
             lastLine = last
-            sendRpcAsync("scroll", params: [firstLine, lastLine])
+            document.sendRPCActionAsync(.Scroll(firstLine, lastLine))
         }
     }
 
@@ -682,7 +744,7 @@ class EditView: NSView, NSTextInputClient {
     
     func fetchLineRange(first: Int, _ last: Int) -> [[AnyObject]]? {
         let start = NSDate()
-        if let result = sendRpc("render_lines", params: ["first_line": first, "last_line": last]) as? [[AnyObject]] {
+        if let result = document.sendRPCAction(.RenderLines(first, last)) as? [[AnyObject]] {
             let interval = NSDate().timeIntervalSinceDate(start)
             Swift.print(String(format: "RPC latency = %3.2fms", interval as Double * 1e3))
             return result
@@ -701,18 +763,25 @@ class EditView: NSView, NSTextInputClient {
             return true
         }
     }
+    
+    func updateIsFrontmost(frontmost : Bool) {
+        isFrontmost = frontmost
+        setInsertionBlink(isFrontmost)
+        needsDisplay = true
 
+    }
+    
     // MARK: - Debug Methods
 
     @IBAction func debugRewrap(sender: AnyObject) {
-        sendRpcAsync("debug_rewrap", params: [])
+        document.sendRPCActionAsync(.DebugRewrap)
     }
 
     @IBAction func debugTestFGSpans(sender: AnyObject) {
-        sendRpcAsync("debug_test_fg_spans", params: [])
+        document.sendRPCActionAsync(.DebugTestFGSpans)
     }
 
     @IBAction func debugRunPlugin(sender: AnyObject) {
-        sendRpcAsync("debug_run_plugin", params: [])
+        document.sendRPCActionAsync(.DebugRunPlugin)
     }
 }
