@@ -22,18 +22,34 @@ use serde_json::builder::ObjectBuilder;
 use xi_rope::rope::Rope;
 use editor::Editor;
 use rpc::{TabCommand, EditCommand};
+use search::{Search, SearchState};
 use MainPeer;
+
+pub struct SharedState {
+    kill_ring: Rope,
+    search: SearchState
+}
+impl SharedState {
+    fn new() -> SharedState {
+        SharedState {
+            kill_ring: Rope::from(""),
+            search: SearchState::new()
+        }
+    }
+}
 
 pub struct Tabs {
     tabs: BTreeMap<String, Arc<Mutex<Editor>>>,
     id_counter: usize,
-    kill_ring: Arc<Mutex<Rope>>,
+    //kill_ring: Arc<Mutex<Rope>>,
+    shared_state: Arc<Mutex<SharedState>>,
 }
 
 #[derive(Clone)]
 pub struct TabCtx {
     tab: String,
-    kill_ring: Arc<Mutex<Rope>>,
+    //kill_ring: Arc<Mutex<Rope>>,
+    shared_state: Arc<Mutex<SharedState>>,
     rpc_peer: MainPeer,
 }
 
@@ -42,7 +58,8 @@ impl Tabs {
         Tabs {
             tabs: BTreeMap::new(),
             id_counter: 0,
-            kill_ring: Arc::new(Mutex::new(Rope::from(""))),
+            shared_state: Arc::new(Mutex::new(SharedState::new())),
+            //kill_ring: Arc::new(Mutex::new(Rope::from(""))),
         }
     }
 
@@ -84,7 +101,8 @@ impl Tabs {
         self.id_counter += 1;
         let tab_ctx = TabCtx {
             tab: tabname.clone(),
-            kill_ring: self.kill_ring.clone(),
+            //kill_ring: self.kill_ring.clone(),
+            shared_state: self.shared_state.clone(),
             rpc_peer: rpc_peer.clone(),
         };
         let editor = Editor::new(tab_ctx);
@@ -107,12 +125,19 @@ impl TabCtx {
     }
 
     pub fn get_kill_ring(&self) -> Rope {
-        self.kill_ring.lock().unwrap().clone()
+        self.shared_state.lock().unwrap().kill_ring.clone()
     }
 
     pub fn set_kill_ring(&self, val: Rope) {
-        let mut kill_ring = self.kill_ring.lock().unwrap();
-        *kill_ring = val;
+        let mut shared_state = self.shared_state.lock().unwrap();
+        shared_state.kill_ring = val;
+    }
+    pub fn get_search(&self) -> Option<Search> {
+        self.shared_state.lock().unwrap().search.maybe_search()
+    }
+    pub fn set_search(&self, val: SearchState) {
+        let mut shared_state = self.shared_state.lock().unwrap();
+        shared_state.search = val;
     }
 
     pub fn alert(&self, msg: &str) {
@@ -122,4 +147,3 @@ impl TabCtx {
                 .build());
     }
 }
-

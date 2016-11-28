@@ -8,6 +8,7 @@ authors = ["Raph Levien <raph@google.com>"]
 serde = "0.8"
 serde_json = "0.8"
 time = "0.1"
+regex = "0.1.80"
 
 [dependencies.xi-rope]
 path = "rope"
@@ -17,3 +18,4 @@ path = "unicode"
 
 [dependencies.xi-rpc]
 path = "rpc"
+

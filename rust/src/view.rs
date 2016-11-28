@@ -41,6 +41,7 @@ pub struct View {
     height: usize,  // height of visible portion
     breaks: Option<Breaks>,
     style_spans: Spans<Style>,
+    pub find_spans: Spans<()>,
     cols: usize,
 }
 
@@ -53,6 +54,7 @@ impl Default for View {
             height: 10,
             breaks: None,
             style_spans: Spans::default(),
+            find_spans: Spans::default(),
             cols: 0,
         }
     }
@@ -135,6 +137,7 @@ impl View {
             let l_len = l.len();
             line_builder = line_builder.push(l);
             line_builder = self.render_spans(line_builder, start_pos, pos);
+            line_builder = self.render_findage(line_builder, start_pos, pos);
             if line_num >= sel_min_line && line_num <= sel_max_line && self.sel_start != self.sel_end {
                 let sel_start_ix = if line_num == sel_min_line {
                     self.sel_min() - self.offset_of_line(text, line_num)
@@ -175,6 +178,17 @@ impl View {
                     .push(iv.end())
                     .push(style.fg)
                     .push(style.font_style));
+        }
+        builder
+    }
+
+    pub fn render_findage(&self, mut builder: ArrayBuilder, start: usize, end: usize) -> ArrayBuilder {
+        let find_spans = self.find_spans.subseq(Interval::new_closed_open(start, end));
+        for (iv, _) in find_spans.iter() {
+            builder = builder.push_array(|builder|
+                builder.push("hit")
+                    .push(iv.start())
+                    .push(iv.end()));
         }
         builder
     }
@@ -304,6 +318,10 @@ impl View {
         // text. That's ok for syntax highlighting but not ideal for rich text.
         let empty_spans = SpansBuilder::new(new_len).build();
         self.style_spans.edit(iv, empty_spans);
+
+        // Just clobber the findage for now.
+        self.find_spans = SpansBuilder::new(text.len()).build();
+
     }
 
     pub fn reset_breaks(&mut self) {
@@ -319,5 +337,9 @@ impl View {
 
     pub fn set_fg_spans(&mut self, start: usize, end: usize, spans: Spans<Style>) {
         self.style_spans.edit(Interval::new_closed_closed(start, end), spans);
+    }
+
+    pub fn set_find_spans(&mut self, start: usize, end: usize, spans: Spans<()>) {
+        self.find_spans.edit(Interval::new_closed_closed(start, end), spans);
     }
 }

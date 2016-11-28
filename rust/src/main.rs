@@ -15,6 +15,7 @@
 extern crate serde;
 extern crate serde_json;
 extern crate time;
+extern crate regex;
 
 use std::io;
 
@@ -29,6 +30,7 @@ mod view;
 mod linewrap;
 mod rpc;
 mod run_plugin;
+mod search;
 
 use tabs::Tabs;
 use rpc::Request;

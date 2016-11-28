@@ -32,6 +32,8 @@ use tabs::TabCtx;
 use rpc::EditCommand;
 use run_plugin::{start_plugin, PluginRef};
 
+use search::{SearchState, Search};
+
 const FLAG_SELECT: u64 = 2;
 
 const MAX_UNDOS: usize = 20;
@@ -688,6 +690,75 @@ impl Editor {
         self.add_delta(interval, Rope::from(swapped), end, end);
     }
 
+    fn update_search(&mut self, find_str: &str, flags: u64) -> Value {
+
+        let search_state = SearchState::from_str_and_flags(find_str,  flags);
+
+        // The frontend needs to know if the regex is bad.
+        // It is not obvious that it needs an editor to tell it.
+        let is_err = search_state.is_err();
+
+        let s = search_state.maybe_search();
+
+        self.tab_ctx.set_search(search_state);
+
+        if is_err {
+            // Return this from somewhere else? above us?
+            return Value::String(String::from("err"))
+        }
+
+        // Actually search the Rope for the pattern.
+        // TODO move this if into search_all (something wasn't clonable?).
+        let found_spans =
+            if let Some(s) = s {
+                s.search_all(&self.text)
+            }
+            else {
+                SpansBuilder::new(self.text.len()).build()
+            };
+
+        self.view.set_find_spans(0, self.text.len(), found_spans);
+        self.view_dirty = true;
+        self.render();
+
+        Value::String(String::from("ok"))
+    }
+
+    fn sel_find_forward(&mut self) {
+        let mut new_sel = None;
+        for (i, _) in self.view.find_spans.iter() {
+            if i.is_after(self.view.sel_end) {
+                new_sel = Some((i.start(), i.end()));
+                print_err!("Found: {:?}", new_sel);
+                break
+
+            }
+        }
+        if let Some((new_sel_start, new_sel_end)) = new_sel {
+            self.set_cursor(new_sel_start, true);
+            self.modify_selection();
+            self.set_cursor(new_sel_end, true);
+        }
+    }
+
+    fn sel_find_backward(&mut self) {
+        let mut new_sel = None;
+        for (i, _) in self.view.find_spans.iter() {
+            if i.is_before(self.view.sel_start) {
+                new_sel = Some((i.start(), i.end()));
+            }
+            else {
+                break
+            }
+        }
+        if let Some((new_sel_start, new_sel_end)) = new_sel {
+            self.set_cursor(new_sel_start, true);
+            self.modify_selection();
+            self.set_cursor(new_sel_end, true);
+        }
+    }
+
+
     fn delete_to_end_of_paragraph(&mut self) {
         let current = self.view.sel_max();
         let offset = self.cursor_end_offset();
@@ -776,6 +847,9 @@ impl Editor {
             DebugRewrap => async(self.debug_rewrap()),
             DebugTestFgSpans => async(self.debug_test_fg_spans()),
             DebugRunPlugin => async(self.debug_run_plugin(self_ref)),
+            UpdateSearch { text, flags } => Some(self.update_search(text, flags)),
+            FindNext => async(self.sel_find_forward()),
+            FindPrev => async(self.sel_find_backward()),
         };
 
         // TODO: could defer this until input quiesces - will this help?
