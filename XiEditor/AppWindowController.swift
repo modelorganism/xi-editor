@@ -63,7 +63,7 @@ class AppWindowController: NSWindowController {
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(AppWindowController.frameDidChangeNotification(_:)), name: NSViewFrameDidChangeNotification, object: scrollView)
         updateEditViewScroll()
     }
-
+    
     func windowWillClose(_: NSNotification) {
         guard let tabName = editView.tabName
             else { return }
@@ -111,5 +111,16 @@ class AppWindowController: NSWindowController {
 
     func handleMouseUp(theEvent: NSEvent) {
         editView.mouseUp(theEvent)
+    }
+}
+
+extension AppWindowController: NSWindowDelegate {
+    func windowDidBecomeMain(notification: NSNotification) {
+        editView.updateSearch(appDelegate.searchText)
+        editView.setFrontMost(true)
+    }
+    
+    func windowDidResignMain(notification: NSNotification) {
+        editView.setFrontMost(false)
     }
 }

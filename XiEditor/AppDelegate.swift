@@ -14,6 +14,11 @@
 
 import Cocoa
 
+class SearchInfo : NSObject {
+    dynamic var searchText: NSString? = nil
+}
+
+
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -120,5 +125,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(aNotification: NSNotification) {
         // Insert code here to tear down your application
     }
+    
+    // MARK: - Find (Search)
+    
+    struct SearchParams {
+        let isRegExp: Bool
+        let matchCase: Bool
+        let wholeWordOnly: Bool
+    }
+    var searchInfo: SearchInfo = SearchInfo()
 
+    var searchParams: SearchParams = SearchParams(
+        isRegExp: false,
+        matchCase: false,
+        wholeWordOnly: false)
+        
+    var searchPanelContoller: SearchPanelContoller? = nil
+    func showSearchPanel()  {
+        if self.searchPanelContoller == nil {
+            self.searchPanelContoller = SearchPanelContoller.make(searchInfo, appDelegate: self)
+        }
+        searchPanelContoller?.showWindow(self)
+        searchPanelContoller?.window?.makeKeyWindow()
+    }
+    
+    func enterSearchString(newSearchString: String) {
+        searchInfo.searchText = newSearchString
+    }
+    
+    // Find/Replace
+    
+    var searchText: String  {
+        return self.searchInfo.searchText as? String ?? ""
+    }
+    
+    func applicationDidBecomeActive(notification: NSNotification) {
+        if let newSearchText = NSPasteboard(name: NSFindPboard).stringForType(NSStringPboardType) {
+            enterSearchString(newSearchText)
+        }
+    }
+    
+    func applicationWillResignActive(notification: NSNotification) {
+        guard let searchText = self.searchInfo.searchText as? String else {return}
+
+        let find_pboard = NSPasteboard(name: NSFindPboard)
+        find_pboard.declareTypes([NSStringPboardType], owner: self)
+        find_pboard.setString(searchText , forType: NSStringPboardType)
+    }
 }

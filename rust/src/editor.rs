@@ -32,7 +32,7 @@ use tabs::TabCtx;
 use rpc::EditCommand;
 use run_plugin::{start_plugin, PluginRef};
 
-use search::{SearchState, Search};
+use search::SearchState;
 
 const FLAG_SELECT: u64 = 2;
 
@@ -729,7 +729,6 @@ impl Editor {
         for (i, _) in self.view.find_spans.iter() {
             if i.is_after(self.view.sel_end) {
                 new_sel = Some((i.start(), i.end()));
-                print_err!("Found: {:?}", new_sel);
                 break
 
             }

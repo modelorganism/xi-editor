@@ -204,6 +204,15 @@ class EditView: NSView, NSTextInputClient {
                 if type == "cursor" {
                     cursor = attr[1] as? Int
                     self.cursorPos = (lineIx, utf8_offset_to_utf16(s, cursor!))
+                
+                } else if type == "hit" {
+                    if !isFrontMost { continue }
+                    let start = attr[1] as! Int
+                    let u16_start = utf8_offset_to_utf16(s, start)
+                    let end = attr[2] as! Int
+                    let u16_end = utf8_offset_to_utf16(s, end)
+                    attrString.addAttribute(NSBackgroundColorAttributeName, value:NSColor.yellowColor(), range: NSMakeRange(u16_start, u16_end - u16_start))
+                
                 } else if type == "sel" {
                     let start = attr[1] as! Int
                     let u16_start = utf8_offset_to_utf16(s, start)
@@ -658,7 +667,57 @@ class EditView: NSView, NSTextInputClient {
             return true
         }
     }
-
+    
+    var isFrontMost: Bool = true
+    
+    func setFrontMost(isFrontMost: Bool) {
+        self.isFrontMost = isFrontMost
+        needsDisplay = true
+    }
+    
+    // MARK: - Find (Search)
+    
+    func updateSearch(text: String) {
+        sendRpc("update_search", params: ["text": text, "flags": 0])
+    }
+    
+    func findNext() {
+        sendRpc("sel_find_next", params: [])
+    }
+    
+    func findPrev() {
+        sendRpc("sel_find_prev", params: [])
+    }
+    
+    @objc func performFindPanelAction(sender: AnyObject?) {
+        guard let rawTag = sender?.tag else {
+            return
+        }
+        guard let tag = NSTextFinderAction(rawValue: rawTag) else{
+            return
+        }
+        switch tag {
+        case NSTextFinderAction.ShowFindInterface:
+            guard let appDelegate = NSApplication.sharedApplication().delegate as? AppDelegate else {
+                return
+            }
+            appDelegate.showSearchPanel()
+        case NSTextFinderAction.SetSearchString:
+            guard let appDelegate = NSApplication.sharedApplication().delegate as? AppDelegate else {
+                return
+            }
+            guard let text = sendRpc("copy", params: []) as? String else { return }
+            updateSearch(text)
+            appDelegate.enterSearchString(text)
+            
+        case NSTextFinderAction.NextMatch:
+            findNext()
+        case NSTextFinderAction.PreviousMatch:
+            findPrev()
+        default: ()
+        }
+    }
+    
     // MARK: - Debug Methods
 
     @IBAction func debugRewrap(sender: AnyObject) {
