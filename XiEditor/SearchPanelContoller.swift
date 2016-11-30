@@ -18,16 +18,25 @@ class SearchPanelContoller: NSWindowController {
         self.init(windowNibName: "SearchPanel")
     }
     
+    @IBOutlet var searchTextField: NSTextField!
+    
     private var kvoContext: UInt8 = 1
     
+    @IBAction func forceUpdate(sender: AnyObject?) {
+        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec())
+    }
+    
     @IBAction func findNext(sender: AnyObject?) {
+        forceUpdate(self)
         appMainDoc()?.editView.findNext()
     
     }
     
     @IBAction func findPrev(sender: AnyObject?) {
+        forceUpdate(self)
         appMainDoc()?.editView.findPrev()
     }
+
     
     private func appMainDoc() -> AppWindowController? {
         return NSApplication.sharedApplication().mainWindow?.delegate as? AppWindowController
@@ -38,16 +47,17 @@ class SearchPanelContoller: NSWindowController {
         let s = SearchPanelContoller()
         s.searchInfo = searchInfo
         s.appDelegate = appDelegate
-        s.searchInfo.addObserver(s, forKeyPath: "searchText", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
+        //s.searchInfo.addObserver(s, forKeyPath: "searchText", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
         searchInfo
         return s
     }
     
+    /*
     override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
         if context == &kvoContext {
             let searchText = searchInfo.searchText as? String ?? ""
             appMainDoc()?.editView.updateSearch(searchText)
         }
-    }
+    }*/
 }
 

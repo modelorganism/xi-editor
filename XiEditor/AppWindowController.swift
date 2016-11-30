@@ -114,24 +114,24 @@ class AppWindowController: NSWindowController {
     }
 }
 
-<<<<<<< HEAD
 extension AppWindowController: NSWindowDelegate {
+    // AppWindowController.xib makes us the window's delegate (as nib owner), as well as its controler.
+    
     func windowDidBecomeMain(notification: NSNotification) {
-        editView.updateSearch(appDelegate.searchText)
+        editView.updateSearch(appDelegate.searchInfo.getSeachSpec())
         editView.setFrontMost(true)
     }
     
     func windowDidResignMain(notification: NSNotification) {
         editView.setFrontMost(false)
-=======
-// AppWindowController.xib makes us the window's delegate (as nib owner), as well as its controler.
-extension AppWindowController: NSWindowDelegate {
+
+    }
+    
     func windowDidBecomeKey(notification: NSNotification) {
         editView.updateIsFrontmost(true)
     }
     func windowDidResignKey(notification: NSNotification) {
         editView.updateIsFrontmost(false);
         
->>>>>>> master
     }
 }

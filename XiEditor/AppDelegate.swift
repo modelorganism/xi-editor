@@ -14,8 +14,16 @@
 
 import Cocoa
 
+// Cocoa Bindings artifact.
 class SearchInfo : NSObject {
     dynamic var searchText: NSString? = nil
+    dynamic var wholeWords: Bool = false
+    dynamic var caseSensitive: Bool = false
+    
+    func getSeachSpec() -> SearchSpec {
+        return SearchSpec(string:(searchText as? String ?? ""), caseSensitive:caseSensitive, wholeWords:wholeWords)
+    }
+    
 }
 
 

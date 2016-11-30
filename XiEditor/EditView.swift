@@ -62,6 +62,20 @@ func camelCaseToUnderscored(name: NSString) -> NSString {
     return underscored;
 }
 
+struct SearchSpec {
+    let string: String
+    let caseSensitive: Bool
+    let wholeWords: Bool
+}
+extension SearchSpec {
+    static let CASE_SENSITIVE: Int = 2
+    static let WHOLE_WORDS: Int = 4
+    func get_flags() -> Int {
+        return (caseSensitive ? SearchSpec.CASE_SENSITIVE : 0) | (wholeWords ? SearchSpec.WHOLE_WORDS : 0)
+    }
+}
+
+
 class EditView: NSView, NSTextInputClient {
     var tabName: String?
     var coreConnection: CoreConnection?
@@ -215,7 +229,7 @@ class EditView: NSView, NSTextInputClient {
                     self.cursorPos = (lineIx, utf8_offset_to_utf16(s, cursor!))
                 
                 } else if type == "hit" {
-                    if !isFrontMost { continue }
+                    if !isMain { continue }
                     let start = attr[1] as! Int
                     let u16_start = utf8_offset_to_utf16(s, start)
                     let end = attr[2] as! Int
@@ -726,18 +740,17 @@ class EditView: NSView, NSTextInputClient {
         }
     }
     
-<<<<<<< HEAD
-    var isFrontMost: Bool = true
+    var isMain: Bool = true
     
     func setFrontMost(isFrontMost: Bool) {
-        self.isFrontMost = isFrontMost
+        self.isMain = isFrontMost
         needsDisplay = true
     }
     
     // MARK: - Find (Search)
     
-    func updateSearch(text: String) {
-        sendRpc("update_search", params: ["text": text, "flags": 0])
+    func updateSearch(searchSpec: SearchSpec) {
+        sendRpc("update_search", params: [ "text": searchSpec.string,  "flags": searchSpec.get_flags()])
     }
     
     func findNext() {
@@ -766,8 +779,8 @@ class EditView: NSView, NSTextInputClient {
                 return
             }
             guard let text = sendRpc("copy", params: []) as? String else { return }
-            updateSearch(text)
             appDelegate.enterSearchString(text)
+            updateSearch(appDelegate.searchInfo.getSeachSpec())
             
         case NSTextFinderAction.NextMatch:
             findNext()
@@ -777,14 +790,12 @@ class EditView: NSView, NSTextInputClient {
         }
     }
     
-=======
     func updateIsFrontmost(frontmost : Bool) {
         isFrontmost = frontmost
         setInsertionBlink(isFrontmost)
         needsDisplay = true
     }
     
->>>>>>> master
     // MARK: - Debug Methods
 
     @IBAction func debugRewrap(sender: AnyObject) {
