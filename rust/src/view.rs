@@ -37,6 +37,7 @@ pub struct Style {
 pub struct View {
     pub sel_start: usize,
     pub sel_end: usize,
+    pub sel_is_find: bool,
     first_line: usize,  // vertical scroll position
     height: usize,  // height of visible portion
     breaks: Option<Breaks>,
@@ -50,6 +51,7 @@ impl Default for View {
         View {
             sel_start: 0,
             sel_end: 0,
+            sel_is_find: false,
             first_line: 0,
             height: 10,
             breaks: None,
@@ -153,6 +155,7 @@ impl View {
                     builder.push("sel")
                         .push(sel_start_ix)
                         .push(sel_end_ix)
+                        .push(if self.sel_is_find {1} else {0})
                 );
             }
             if line_num == cursor_line {

@@ -118,6 +118,7 @@ extension AppWindowController: NSWindowDelegate {
     // AppWindowController.xib makes us the window's delegate (as nib owner), as well as its controler.
     
     func windowDidBecomeMain(notification: NSNotification) {
+        //TODO: XXX this moves the selection as if the user had typed the find string 
         editView.updateSearch(appDelegate.searchInfo.getSeachSpec())
         editView.setFrontMost(true)
     }

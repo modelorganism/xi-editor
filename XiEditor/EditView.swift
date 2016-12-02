@@ -240,8 +240,9 @@ class EditView: NSView, NSTextInputClient {
                     let start = attr[1] as! Int
                     let u16_start = utf8_offset_to_utf16(s, start)
                     let end = attr[2] as! Int
+                    let code = attr[3] as! Int
                     let u16_end = utf8_offset_to_utf16(s, end)
-                    attrString.addAttribute(NSBackgroundColorAttributeName, value: selcolor(), range: NSMakeRange(u16_start, u16_end - u16_start))
+                    attrString.addAttribute(NSBackgroundColorAttributeName, value: selcolor(code), range: NSMakeRange(u16_start, u16_end - u16_start))
                 } else if type == "fg" {
                     let start = attr[1] as! Int
                     let u16_start = utf8_offset_to_utf16(s, start)
@@ -640,12 +641,12 @@ class EditView: NSView, NSTextInputClient {
     }
     
     // Background color for selected text. Only the first responder of the key window should have a non-gray selection.
-    func selcolor() -> NSColor {
+    func selcolor(code :Int) -> NSColor {
         if isFrontmost {
             return fgSelcolor
         }
         else {
-            return bgSelcolor
+            return code==0 ? bgSelcolor : NSColor.orangeColor()
         }
     }
 
@@ -748,7 +749,9 @@ class EditView: NSView, NSTextInputClient {
     }
     
     // MARK: - Find (Search)
-    
+    // We need to distiguish:
+    // hard update - user typed - move selection
+    // soft update - window became main - just update the yellow
     func updateSearch(searchSpec: SearchSpec) {
         sendRpc("update_search", params: [ "text": searchSpec.string,  "flags": searchSpec.get_flags()])
     }

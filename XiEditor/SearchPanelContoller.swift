@@ -22,21 +22,34 @@ class SearchPanelContoller: NSWindowController {
     
     private var kvoContext: UInt8 = 1
     
+    //TODO: change name this is just 'user hit enter'
     @IBAction func forceUpdate(sender: AnyObject?) {
-        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec())
+        findNext()
     }
     
     @IBAction func findNext(sender: AnyObject?) {
-        forceUpdate(self)
+        //forceUpdate()
         appMainDoc()?.editView.findNext()
     
     }
     
     @IBAction func findPrev(sender: AnyObject?) {
-        forceUpdate(self)
-        appMainDoc()?.editView.findPrev()
+        //forceUpdate()
+        findPrev()
     }
 
+    private func forceUpdate() {
+        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec())
+    }
+
+    
+    private func findPrev() {
+        appMainDoc()?.editView.findPrev()
+    }
+    
+    private func findNext() {
+        appMainDoc()?.editView.findNext()
+    }
     
     private func appMainDoc() -> AppWindowController? {
         return NSApplication.sharedApplication().mainWindow?.delegate as? AppWindowController
@@ -47,17 +60,32 @@ class SearchPanelContoller: NSWindowController {
         let s = SearchPanelContoller()
         s.searchInfo = searchInfo
         s.appDelegate = appDelegate
-        //s.searchInfo.addObserver(s, forKeyPath: "searchText", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
+        s.searchInfo.addObserver(s, forKeyPath: "searchText", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
         searchInfo
         return s
     }
     
-    /*
+    
     override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
         if context == &kvoContext {
-            let searchText = searchInfo.searchText as? String ?? ""
-            appMainDoc()?.editView.updateSearch(searchText)
+            appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec())
+        }
+    }
+    
+    /*
+    @objc func performFindPanelAction(sender: AnyObject?) {
+        guard let rawTag = sender?.tag else {
+            return
+        }
+        guard let tag = NSTextFinderAction(rawValue: rawTag) else{
+            return
+        }
+        switch tag {
+        case NSTextFinderAction.NextMatch:
+            findNext()
+        case NSTextFinderAction.PreviousMatch:
+            findPrev()
+        default: ()
         }
     }*/
 }
-

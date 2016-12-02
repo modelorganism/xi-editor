@@ -84,7 +84,7 @@ enum EditType {
 }
 
 impl EditType {
-    pub fn json_string(&self) -> &'static str {
+        pub fn json_string(&self) -> &'static str {
         match *self {
             EditType::InsertChars => "insert",
             EditType::Delete => "delete",
@@ -140,6 +140,7 @@ impl Editor {
         }
         self.view.scroll_to_cursor(&self.text);
         self.view_dirty = true;
+        self.view.sel_is_find = false;
     }
 
     // Apply the delta to the buffer, and store the new cursor so that it gets
@@ -718,26 +719,37 @@ impl Editor {
             };
 
         self.view.set_find_spans(0, self.text.len(), found_spans);
+
+        let start = self.view.sel_start;
+        self.view.sel_is_find = false;
+        self.sel_find_forward_from(start);
+
         self.view_dirty = true;
         self.render();
 
         Value::String(String::from("ok"))
     }
 
-    fn sel_find_forward(&mut self) {
+
+    fn sel_find_forward_from(&mut self, start: usize) {
         let mut new_sel = None;
         for (i, _) in self.view.find_spans.iter() {
-            if i.is_after(self.view.sel_end) {
+            if start==i.start() || i.is_after(start) {
                 new_sel = Some((i.start(), i.end()));
                 break
-
             }
         }
         if let Some((new_sel_start, new_sel_end)) = new_sel {
             self.set_cursor(new_sel_start, true);
             self.modify_selection();
             self.set_cursor(new_sel_end, true);
+            self.view.sel_is_find = true
         }
+    }
+
+    fn sel_find_forward(&mut self) {
+        let start = self.view.sel_end;
+        self.sel_find_forward_from(start)
     }
 
     fn sel_find_backward(&mut self) {
@@ -754,6 +766,7 @@ impl Editor {
             self.set_cursor(new_sel_start, true);
             self.modify_selection();
             self.set_cursor(new_sel_end, true);
+            self.view.sel_is_find = true
         }
     }
 
