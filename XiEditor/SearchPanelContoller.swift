@@ -24,22 +24,20 @@ class SearchPanelContoller: NSWindowController {
     
     //TODO: change name this is just 'user hit enter'
     @IBAction func forceUpdate(sender: AnyObject?) {
-        findNext()
+        appMainDoc()?.editView.selectFind(0)
     }
     
     @IBAction func findNext(sender: AnyObject?) {
-        //forceUpdate()
         appMainDoc()?.editView.findNext()
     
     }
     
     @IBAction func findPrev(sender: AnyObject?) {
-        //forceUpdate()
         findPrev()
     }
 
-    private func forceUpdate() {
-        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec())
+    private func forceUpdate(hard: Bool) {
+        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec(), hard: hard)
     }
 
     
@@ -61,31 +59,39 @@ class SearchPanelContoller: NSWindowController {
         s.searchInfo = searchInfo
         s.appDelegate = appDelegate
         s.searchInfo.addObserver(s, forKeyPath: "searchText", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
-        searchInfo
+        s.searchInfo.addObserver(s, forKeyPath: "wholeWords", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
+        s.searchInfo.addObserver(s, forKeyPath: "caseSensitive", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
         return s
     }
     
     
     override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
         if context == &kvoContext {
-            appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec())
+            forceUpdate(true)
         }
     }
     
-    /*
     @objc func performFindPanelAction(sender: AnyObject?) {
-        guard let rawTag = sender?.tag else {
-            return
-        }
-        guard let tag = NSTextFinderAction(rawValue: rawTag) else{
-            return
+        guard
+            let rawTag = sender?.tag,
+            let tag = NSTextFinderAction(rawValue: rawTag)
+            else {
+                return
         }
         switch tag {
-        case NSTextFinderAction.NextMatch:
+        case .NextMatch:
             findNext()
-        case NSTextFinderAction.PreviousMatch:
-            findPrev()
+        case .PreviousMatch:
+           findPrev()
         default: ()
         }
-    }*/
+    }
+    
+    
+    deinit {
+        searchInfo.removeObserver(self, forKeyPath: "wholeWords")
+        searchInfo.removeObserver(self, forKeyPath: "caseSensitive")
+        searchInfo.removeObserver(self, forKeyPath: "searchText")
+    }
+    
 }

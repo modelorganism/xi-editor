@@ -693,7 +693,7 @@ impl Editor {
 
     fn update_search(&mut self, find_str: &str, flags: u64) -> Value {
 
-        let search_state = SearchState::from_str_and_flags(find_str,  flags);
+        let (search_state, hard) = SearchState::from_str_and_flags(find_str,  flags);
 
         // The frontend needs to know if the regex is bad.
         // It is not obvious that it needs an editor to tell it.
@@ -709,6 +709,7 @@ impl Editor {
         }
 
         // Actually search the Rope for the pattern.
+        // This produces the find spans, which record were the pattern hits in the text.
         // TODO move this if into search_all (something wasn't clonable?).
         let found_spans =
             if let Some(s) = s {
@@ -720,9 +721,17 @@ impl Editor {
 
         self.view.set_find_spans(0, self.text.len(), found_spans);
 
-        let start = self.view.sel_start;
         self.view.sel_is_find = false;
-        self.sel_find_forward_from(start);
+
+        if hard {
+            // If we are doing a hard update, the user typing an incremental search,
+            // move the selection to the selection to the first occurance of the pattern
+            // after the *start* of the currently selection.
+            // If the user types the next char, this dose not *move* the selection,
+            // but extends it.
+            let start = self.view.sel_start;
+            self.sel_find_forward_from(start);
+        }
 
         self.view_dirty = true;
         self.render();
@@ -752,6 +761,29 @@ impl Editor {
         self.sel_find_forward_from(start)
     }
 
+
+    // hmm not working
+    fn sel_find_curr(&mut self) {
+        let start = self.view.sel_start;
+        let mut new_sel = None;
+        for (i, _) in self.view.find_spans.iter() {
+            if self.view.sel_start==i.start() && self.view.sel_end < i.end() {
+                new_sel = Some((i.start(), i.end()));
+                break
+            }
+            if i.is_after(start) {
+                new_sel = Some((i.start(), i.end()));
+                break
+            }
+        }
+        if let Some((new_sel_start, new_sel_end)) = new_sel {
+            self.set_cursor(new_sel_start, true);
+            self.modify_selection();
+            self.set_cursor(new_sel_end, true);
+            self.view.sel_is_find = true
+        }
+    }
+
     fn sel_find_backward(&mut self) {
         let mut new_sel = None;
         for (i, _) in self.view.find_spans.iter() {
@@ -770,6 +802,14 @@ impl Editor {
         }
     }
 
+    fn sel_find(&mut self, flags: u64) {
+        match flags {
+            0 => self.sel_find_curr(),
+            1 => self.sel_find_forward(),
+            2 => self.sel_find_backward(),
+            _ => ()
+        }
+    }
 
     fn delete_to_end_of_paragraph(&mut self) {
         let current = self.view.sel_max();
@@ -862,6 +902,7 @@ impl Editor {
             UpdateSearch { text, flags } => Some(self.update_search(text, flags)),
             FindNext => async(self.sel_find_forward()),
             FindPrev => async(self.sel_find_backward()),
+            SelSearch { flags } => async(self.sel_find(flags)),
         };
 
         // TODO: could defer this until input quiesces - will this help?

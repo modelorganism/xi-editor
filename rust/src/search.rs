@@ -4,7 +4,9 @@ use xi_rope::rope::Rope;
 use xi_rope::spans::{Spans,SpansBuilder};
 use xi_rope::interval::Interval;
 
-const REGEX: u64 = 1;
+// Immeadiatly select the first occurance. This option is not stored like the others.
+const HARD_UPDATE: u64 = 1;
+
 const CASE_SENSITIVE: u64 = 2;
 const WHOLE_WORDS: u64 = 4;
 
@@ -19,7 +21,7 @@ impl SearchOpts {
     /// Read the flags.
     pub fn from_flags(flags: u64) -> SearchOpts {
         SearchOpts{
-            is_grep: REGEX&flags!=0,
+            is_grep: false,
             only_words: WHOLE_WORDS&flags!=0,
             case_sensitive: CASE_SENSITIVE&flags!=0
         }
@@ -41,8 +43,8 @@ impl SearchState {
     }
 
     /// Construct from the string and flags sent from the font end,. Empty string means don't search.
-    pub fn from_str_and_flags(find_str: &str, flags: u64) -> SearchState {
-        SearchState::from_str_and_opts(find_str, SearchOpts::from_flags(flags))
+    pub fn from_str_and_flags(find_str: &str, flags: u64) -> (SearchState, bool) {
+        (SearchState::from_str_and_opts(find_str, SearchOpts::from_flags(flags)), flags&HARD_UPDATE!=0)
     }
 
     pub fn from_str_and_opts(find_str: &str,

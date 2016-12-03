@@ -97,7 +97,8 @@ pub enum EditCommand<'a> {
     DebugRunPlugin,
     UpdateSearch { text: &'a str, flags: u64 },
     FindNext,
-    FindPrev
+    FindPrev,
+    SelSearch {flags: u64 }
 }
 
 impl<'a> TabCommand<'a> {
@@ -240,6 +241,13 @@ impl<'a> EditCommand<'a> {
                     })
                 })
             }).ok_or_else(|| MalformedEditParams(method.to_string(), params.clone())),
+
+            "sel_find" => params.as_object().and_then(|dict| {
+                dict_get_u64(dict, "flags").map(|flags| {
+                    SelSearch {  flags: flags }
+                })
+            }).ok_or_else(|| MalformedEditParams(method.to_string(), params.clone())),
+
 
             "sel_find_next" => Ok(FindNext),
             "sel_find_prev" => Ok(FindPrev),
