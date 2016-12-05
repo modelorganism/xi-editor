@@ -38,6 +38,7 @@ pub struct View {
     pub sel_start: usize,
     pub sel_end: usize,
     pub sel_is_find: bool,
+    pub show_hits: bool,
     first_line: usize,  // vertical scroll position
     height: usize,  // height of visible portion
     breaks: Option<Breaks>,
@@ -52,6 +53,7 @@ impl Default for View {
             sel_start: 0,
             sel_end: 0,
             sel_is_find: false,
+            show_hits: false,
             first_line: 0,
             height: 10,
             breaks: None,
@@ -186,6 +188,7 @@ impl View {
     }
 
     pub fn render_findage(&self, mut builder: ArrayBuilder, start: usize, end: usize) -> ArrayBuilder {
+        if !self.show_hits { return builder; }
         let find_spans = self.find_spans.subseq(Interval::new_closed_open(start, end));
         for (iv, _) in find_spans.iter() {
             builder = builder.push_array(|builder|
@@ -196,11 +199,30 @@ impl View {
         builder
     }
 
+    pub fn render_findage_tics(&self, text: &Rope, height: usize) -> Value {
+        let mut builder = ArrayBuilder::new();
+        //let height = self.offset_to_line_col(text, text.len()).0 + 1;
+        let mut prev_line = None;
+        for (iv, _) in self.find_spans.iter() {
+            let curr_line = self.offset_to_line_col(text, iv.start()).0;
+            if Some(curr_line) != prev_line {
+                builder = builder.push((curr_line as f32)/(height as f32));
+            }
+            prev_line = Some(curr_line)
+        }
+
+        builder.build()
+    }
+
     pub fn render(&self, text: &Rope, scroll_to: Option<usize>) -> Value {
         let first_line = max(self.first_line, SCROLL_SLOP) - SCROLL_SLOP;
         let last_line = self.first_line + self.height + SCROLL_SLOP;
         let lines = self.render_lines(text, first_line, last_line);
         let height = self.offset_to_line_col(text, text.len()).0 + 1;
+        let find_tics = if self.show_hits {
+            Some(self.render_findage_tics(text, height))
+        }
+        else { None };
         let mut builder = ObjectBuilder::new()
             .insert("lines", lines)
             .insert("first_line", first_line)
@@ -209,6 +231,9 @@ impl View {
             let (line, col) = self.offset_to_line_col(text, scrollto);
             builder = builder.insert_array("scrollto", |builder|
                 builder.push(line).push(col));
+        }
+        if let Some(find_tics) = find_tics {
+            builder = builder.insert("find_tics", find_tics);
         }
         builder.build()
     }

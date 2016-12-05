@@ -4,11 +4,11 @@ use xi_rope::rope::Rope;
 use xi_rope::spans::{Spans,SpansBuilder};
 use xi_rope::interval::Interval;
 
-// Immeadiatly select the first occurance. This option is not stored like the others.
-const HARD_UPDATE: u64 = 1;
+const HARD_UPDATE: u64 = 1; // Immediately select the first occurance.
+const SHOW_HITS: u64 = 2; //
 
-const CASE_SENSITIVE: u64 = 2;
-const WHOLE_WORDS: u64 = 4;
+const CASE_SENSITIVE: u64 = 16;
+const WHOLE_WORDS: u64 = 8;
 
 #[derive(Copy, Clone)]
 pub struct SearchOpts {
@@ -43,8 +43,9 @@ impl SearchState {
     }
 
     /// Construct from the string and flags sent from the font end,. Empty string means don't search.
-    pub fn from_str_and_flags(find_str: &str, flags: u64) -> (SearchState, bool) {
-        (SearchState::from_str_and_opts(find_str, SearchOpts::from_flags(flags)), flags&HARD_UPDATE!=0)
+    pub fn from_str_and_flags(find_str: &str, flags: u64) -> (SearchState, bool, bool) {
+        (SearchState::from_str_and_opts(find_str, SearchOpts::from_flags(flags)),
+                                        flags&HARD_UPDATE!=0, flags&SHOW_HITS!=0)
     }
 
     pub fn from_str_and_opts(find_str: &str,

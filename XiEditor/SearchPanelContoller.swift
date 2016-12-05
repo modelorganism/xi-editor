@@ -37,7 +37,7 @@ class SearchPanelContoller: NSWindowController {
     }
 
     private func forceUpdate(hard: Bool) {
-        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec(), hard: hard)
+        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec(), hard: hard, show:true)
     }
 
     
@@ -63,7 +63,10 @@ class SearchPanelContoller: NSWindowController {
         s.searchInfo.addObserver(s, forKeyPath: "caseSensitive", options: NSKeyValueObservingOptions.New, context: &s.kvoContext)
         return s
     }
-    
+    override func showWindow(sender: AnyObject?) {
+        super.showWindow(sender)
+        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec(), hard: false, show: true)
+    }
     
     override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
         if context == &kvoContext {
@@ -87,11 +90,19 @@ class SearchPanelContoller: NSWindowController {
         }
     }
     
+    //override func
+    
     
     deinit {
         searchInfo.removeObserver(self, forKeyPath: "wholeWords")
         searchInfo.removeObserver(self, forKeyPath: "caseSensitive")
         searchInfo.removeObserver(self, forKeyPath: "searchText")
     }
-    
+}
+
+extension SearchPanelContoller: NSWindowDelegate {
+
+    func windowWillClose(notification: NSNotification) {
+        appMainDoc()?.editView.updateSearch(searchInfo.getSeachSpec(), hard: false, show: false)
+    }
 }

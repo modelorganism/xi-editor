@@ -68,11 +68,16 @@ struct SearchSpec {
     let wholeWords: Bool
 }
 extension SearchSpec {
-    static let HARD_UPDATE: Int = 1
-    static let CASE_SENSITIVE: Int = 2
-    static let WHOLE_WORDS: Int = 4
-    func get_flags() -> Int {
-        return (caseSensitive ? SearchSpec.CASE_SENSITIVE : 0) | (wholeWords ? SearchSpec.WHOLE_WORDS : 0)
+    static let HARD_UPDATE: Int = 1 // Move the selection to next occurance
+    static let SHOW_HITS: Int = 2 // Move the selection to next occurance
+    
+    // Search parameters
+    static let CASE_SENSITIVE: Int = 16
+    static let WHOLE_WORDS: Int = 8
+    func get_flags(hard hard: Bool, show: Bool) -> Int {
+        let internalFlags = (caseSensitive ? SearchSpec.CASE_SENSITIVE : 0) | (wholeWords ? SearchSpec.WHOLE_WORDS : 0)
+        
+        return internalFlags | (hard ? SearchSpec.HARD_UPDATE : 0) | (show ? SearchSpec.SHOW_HITS : 0)
     }
 }
 
@@ -325,6 +330,20 @@ class EditView: NSView, NSTextInputClient {
                 CGContextStrokePath(context)
             }
         }
+        /*
+        if isMain {
+            let top = self.frame.minY
+            let height = self.frame.height
+            let right = self.frame.maxX
+            
+            for find_tic in self.find_tics {
+                let find_tic = CGFloat(find_tic)
+                CGContextSetStrokeColorWithColor(context, NSColor.yellowColor().CGColor )
+                CGContextMoveToPoint(context, right - 100, top + find_tic * height)
+                CGContextAddLineToPoint(context, right, top + find_tic * height)
+                CGContextStrokePath(context)
+            }
+        }*/
     }
     
     override var acceptsFirstResponder: Bool {
@@ -580,11 +599,17 @@ class EditView: NSView, NSTextInputClient {
         return (lineIx, col)
     }
 
+    var find_tics: [Double] = [ ]
+    
     func updateText(text: [String: AnyObject]) {
         self.lineMap = [:]
         let firstLine = text["first_line"] as! Int
         self.height = text["height"] as! Int
         let lines = text["lines"]! as! [[AnyObject]]
+        
+        // I need to get this to a non-scrolling view.
+        //self.find_tics = text["find_tics"] as? [Double] ?? []
+        
         for lineNum in firstLine..<(firstLine + lines.count) {
             self.lineMap[lineNum] = lines[lineNum - firstLine]
         }
@@ -603,6 +628,9 @@ class EditView: NSView, NSTextInputClient {
         if self.isFrontmost {
             setInsertionBlink(true)
         }
+        
+        
+        
         needsDisplay = true
     }
     
@@ -757,10 +785,10 @@ class EditView: NSView, NSTextInputClient {
     // We need to distiguish:
     // hard update - user typed - move selection
     // soft update - window became main - just update the yellow
-    func updateSearch(searchSpec: SearchSpec, hard: Bool) {
+    func updateSearch(searchSpec: SearchSpec, hard: Bool, show: Bool) {
         sendRpc("update_search", params: [
             "text": searchSpec.string,
-            "flags": searchSpec.get_flags() | (hard ? SearchSpec.HARD_UPDATE : 0) ])
+            "flags": searchSpec.get_flags(hard:hard, show:show ) ] )
     }
     
     func selectFind(which: Int ) {
@@ -768,11 +796,13 @@ class EditView: NSView, NSTextInputClient {
     }
     
     func findNext() {
-        sendRpc("sel_find_next", params: [])
+        selectFind(1)
+        //sendRpc("sel_find_next", params: [])
     }
     
     func findPrev() {
-        sendRpc("sel_find_prev", params: [])
+        selectFind(2)
+        //sendRpc("sel_find_prev", params: [])
     }
     
     @objc func performFindPanelAction(sender: AnyObject?) {
@@ -794,7 +824,7 @@ class EditView: NSView, NSTextInputClient {
             }
             guard let text = sendRpc("copy", params: []) as? String else { return }
             appDelegate.enterSearchString(text)
-            updateSearch(appDelegate.searchInfo.getSeachSpec(), hard:true)
+            updateSearch(appDelegate.searchInfo.getSeachSpec(), hard:true, show:true)
             
         case NSTextFinderAction.NextMatch:
             findNext()

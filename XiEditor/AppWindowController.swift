@@ -119,7 +119,9 @@ extension AppWindowController: NSWindowDelegate {
     
     func windowDidBecomeMain(notification: NSNotification) {
         //TODO: XXX this moves the selection as if the user had typed the find string 
-        editView.updateSearch(appDelegate.searchInfo.getSeachSpec(), hard:false)
+        editView.updateSearch(appDelegate.searchInfo.getSeachSpec(),
+                              hard:false,
+                              show:appDelegate.searchPanelContoller?.window?.visible ?? false )
         editView.setFrontMost(true)
     }
     

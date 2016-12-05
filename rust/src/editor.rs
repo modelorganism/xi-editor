@@ -692,8 +692,10 @@ impl Editor {
     }
 
     fn update_search(&mut self, find_str: &str, flags: u64) -> Value {
+        // The front end is communicating new search parameters to us.
+        //
 
-        let (search_state, hard) = SearchState::from_str_and_flags(find_str,  flags);
+        let (search_state, hard, show) = SearchState::from_str_and_flags(find_str,  flags);
 
         // The frontend needs to know if the regex is bad.
         // It is not obvious that it needs an editor to tell it.
@@ -707,6 +709,8 @@ impl Editor {
             // Return this from somewhere else? above us?
             return Value::String(String::from("err"))
         }
+
+        self.view.show_hits = show;
 
         // Actually search the Rope for the pattern.
         // This produces the find spans, which record were the pattern hits in the text.
