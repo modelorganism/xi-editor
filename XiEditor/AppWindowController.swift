@@ -62,6 +62,14 @@ class AppWindowController: NSWindowController {
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(AppWindowController.boundsDidChangeNotification(_:)), name: NSViewBoundsDidChangeNotification, object: scrollView.contentView)
         NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(AppWindowController.frameDidChangeNotification(_:)), name: NSViewFrameDidChangeNotification, object: scrollView)
         updateEditViewScroll()
+        
+        // For search
+        // XXX I'm not 100% sure what we need to wait for - will thus always be long enough?
+        dispatch_async(dispatch_get_main_queue()) {
+            self.editView.updateSearch(self.appDelegate.searchInfo.getSeachSpec(),
+                              hard:false,
+                              show:self.appDelegate.searchPanelContoller?.window?.visible ?? false )
+        }
     }
     
     func windowWillClose(_: NSNotification) {
@@ -118,7 +126,6 @@ extension AppWindowController: NSWindowDelegate {
     // AppWindowController.xib makes us the window's delegate (as nib owner), as well as its controler.
     
     func windowDidBecomeMain(notification: NSNotification) {
-        //TODO: XXX this moves the selection as if the user had typed the find string 
         editView.updateSearch(appDelegate.searchInfo.getSeachSpec(),
                               hard:false,
                               show:appDelegate.searchPanelContoller?.window?.visible ?? false )

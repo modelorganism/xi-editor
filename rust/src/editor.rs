@@ -32,7 +32,7 @@ use tabs::TabCtx;
 use rpc::EditCommand;
 use run_plugin::{start_plugin, PluginRef};
 
-use search::SearchState;
+use search::{SearchState, Search};
 
 const FLAG_SELECT: u64 = 2;
 
@@ -707,21 +707,24 @@ impl Editor {
 
         if is_err {
             // Return this from somewhere else? above us?
+            self.view.set_find_spans(0, self.text.len(), SpansBuilder::new(self.text.len()).build());
             return Value::String(String::from("err"))
         }
 
         self.view.show_hits = show;
 
+        match s {
+            Some(s) => self.perform_search(s, hard),
+            None => self.view.set_find_spans(0, self.text.len(), SpansBuilder::new(self.text.len()).build()),
+        }
+        Value::String(String::from("ok"))
+    }
+
+    fn perform_search(&mut self, s: Search, hard: bool) {
         // Actually search the Rope for the pattern.
         // This produces the find spans, which record were the pattern hits in the text.
         // TODO move this if into search_all (something wasn't clonable?).
-        let found_spans =
-            if let Some(s) = s {
-                s.search_all(&self.text)
-            }
-            else {
-                SpansBuilder::new(self.text.len()).build()
-            };
+        let found_spans = s.search_all(&self.text);
 
         self.view.set_find_spans(0, self.text.len(), found_spans);
 
@@ -738,26 +741,39 @@ impl Editor {
         }
 
         self.view_dirty = true;
-        self.render();
-
-        Value::String(String::from("ok"))
+        self.render(); // XXX for some callers not others.
     }
 
-
-    fn sel_find_forward_from(&mut self, start: usize) {
-        let mut new_sel = None;
-        for (i, _) in self.view.find_spans.iter() {
-            if start==i.start() || i.is_after(start) {
-                new_sel = Some((i.start(), i.end()));
-                break
-            }
-        }
+    fn select_find(&mut self, new_sel: Option<(usize,usize)>) {
         if let Some((new_sel_start, new_sel_end)) = new_sel {
             self.set_cursor(new_sel_start, true);
             self.modify_selection();
             self.set_cursor(new_sel_end, true);
             self.view.sel_is_find = true
         }
+    }
+
+    fn sel_find_forward_from(&mut self, start: usize) {
+        let mut new_sel = None;
+
+        match self.view.find_spans {
+            None => {
+                if let Some(curr_search) = self.tab_ctx.get_search() {
+                    self.perform_search(curr_search, false)
+                }
+            },
+            _ => ()
+        }
+
+        if let Some(ref mut find_spans) = self.view.find_spans {
+            for (i, _) in find_spans.iter() {
+                if start==i.start() || i.is_after(start) {
+                    new_sel = Some((i.start(), i.end()));
+                    break
+                }
+            }
+        }
+        self.select_find(new_sel)
     }
 
     fn sel_find_forward(&mut self) {
@@ -770,7 +786,8 @@ impl Editor {
     fn sel_find_curr(&mut self) {
         let start = self.view.sel_start;
         let mut new_sel = None;
-        for (i, _) in self.view.find_spans.iter() {
+        if let Some(ref mut find_spans) = self.view.find_spans {
+        for (i, _) in find_spans.iter() {
             if self.view.sel_start==i.start() && self.view.sel_end < i.end() {
                 new_sel = Some((i.start(), i.end()));
                 break
@@ -779,31 +796,22 @@ impl Editor {
                 new_sel = Some((i.start(), i.end()));
                 break
             }
-        }
-        if let Some((new_sel_start, new_sel_end)) = new_sel {
-            self.set_cursor(new_sel_start, true);
-            self.modify_selection();
-            self.set_cursor(new_sel_end, true);
-            self.view.sel_is_find = true
-        }
+        }}
+        self.select_find(new_sel)
     }
 
     fn sel_find_backward(&mut self) {
         let mut new_sel = None;
-        for (i, _) in self.view.find_spans.iter() {
+        if let Some(ref mut find_spans) = self.view.find_spans {
+        for (i, _) in find_spans.iter() {
             if i.is_before(self.view.sel_start) {
                 new_sel = Some((i.start(), i.end()));
             }
             else {
                 break
             }
-        }
-        if let Some((new_sel_start, new_sel_end)) = new_sel {
-            self.set_cursor(new_sel_start, true);
-            self.modify_selection();
-            self.set_cursor(new_sel_end, true);
-            self.view.sel_is_find = true
-        }
+        }}
+        self.select_find(new_sel)
     }
 
     fn sel_find(&mut self, flags: u64) {

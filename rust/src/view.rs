@@ -37,14 +37,16 @@ pub struct Style {
 pub struct View {
     pub sel_start: usize,
     pub sel_end: usize,
-    pub sel_is_find: bool,
-    pub show_hits: bool,
     first_line: usize,  // vertical scroll position
     height: usize,  // height of visible portion
     breaks: Option<Breaks>,
     style_spans: Spans<Style>,
-    pub find_spans: Spans<()>,
     cols: usize,
+
+    // Rest find releated.
+    pub find_spans: Option<Spans<()>>,
+    pub sel_is_find: bool,
+    pub show_hits: bool,
 }
 
 impl Default for View {
@@ -52,14 +54,14 @@ impl Default for View {
         View {
             sel_start: 0,
             sel_end: 0,
-            sel_is_find: false,
-            show_hits: false,
             first_line: 0,
             height: 10,
             breaks: None,
             style_spans: Spans::default(),
-            find_spans: Spans::default(),
             cols: 0,
+            find_spans: None,
+            sel_is_find: false,
+            show_hits: false,
         }
     }
 }
@@ -189,13 +191,14 @@ impl View {
 
     pub fn render_findage(&self, mut builder: ArrayBuilder, start: usize, end: usize) -> ArrayBuilder {
         if !self.show_hits { return builder; }
-        let find_spans = self.find_spans.subseq(Interval::new_closed_open(start, end));
+        if let Some(ref find_spans) = self.find_spans {
+        let find_spans = find_spans.subseq(Interval::new_closed_open(start, end));
         for (iv, _) in find_spans.iter() {
             builder = builder.push_array(|builder|
                 builder.push("hit")
                     .push(iv.start())
                     .push(iv.end()));
-        }
+        }}
         builder
     }
 
@@ -203,13 +206,14 @@ impl View {
         let mut builder = ArrayBuilder::new();
         //let height = self.offset_to_line_col(text, text.len()).0 + 1;
         let mut prev_line = None;
-        for (iv, _) in self.find_spans.iter() {
+        if let Some(ref find_spans) = self.find_spans {
+        for (iv, _) in find_spans.iter() {
             let curr_line = self.offset_to_line_col(text, iv.start()).0;
             if Some(curr_line) != prev_line {
                 builder = builder.push((curr_line as f32)/(height as f32));
             }
             prev_line = Some(curr_line)
-        }
+        }}
 
         builder.build()
     }
@@ -348,7 +352,8 @@ impl View {
         self.style_spans.edit(iv, empty_spans);
 
         // Just clobber the findage for now.
-        self.find_spans = SpansBuilder::new(text.len()).build();
+        //self.find_spans = SpansBuilder::new(text.len()).build();
+        self.find_spans = None;
 
     }
 
@@ -368,6 +373,9 @@ impl View {
     }
 
     pub fn set_find_spans(&mut self, start: usize, end: usize, spans: Spans<()>) {
-        self.find_spans.edit(Interval::new_closed_closed(start, end), spans);
+        match self.find_spans {
+            None => self.find_spans = Some(spans),
+            Some(ref mut  find_spans) => find_spans.edit(Interval::new_closed_closed(start, end), spans),
+        }
     }
 }
