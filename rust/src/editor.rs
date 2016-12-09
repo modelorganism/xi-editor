@@ -691,9 +691,9 @@ impl Editor {
         self.add_delta(interval, Rope::from(swapped), end, end);
     }
 
+
     fn update_search(&mut self, find_str: &str, flags: u64) -> Value {
         // The front end is communicating new search parameters to us.
-        //
 
         let (search_state, hard, show) = SearchState::from_str_and_flags(find_str,  flags);
 
@@ -701,29 +701,38 @@ impl Editor {
         // It is not obvious that it needs an editor to tell it.
         let is_err = search_state.is_err();
 
+        // search can be None if search string empty or an erroneous grep
         let s = search_state.maybe_search();
 
         self.tab_ctx.set_search(search_state);
 
-        if is_err {
-            // Return this from somewhere else? above us?
-            self.view.set_find_spans(0, self.text.len(), SpansBuilder::new(self.text.len()).build());
-            return Value::String(String::from("err"))
-        }
-
         self.view.show_hits = show;
 
         match s {
-            Some(s) => self.perform_search(s, hard),
-            None => self.view.set_find_spans(0, self.text.len(), SpansBuilder::new(self.text.len()).build()),
+            Some(s) => {
+                // There is a pattern that could match something.
+                self.perform_search(s, hard);
+                Value::String(String::from("ok"))
+            },
+            None => {
+                // Set the find_spans to empty, we were given somthing that matches nothing.
+                self.view.set_find_spans(0, self.text.len(), SpansBuilder::new(self.text.len()).build());
+                if is_err {
+                    // Bad grep. Tell the user.
+                    Value::String(String::from("err"))
+                }
+                else {
+                    // Empty search string. Matches nothing but not an error.
+                    Value::String(String::from("ok"))
+                }
+            }
         }
-        Value::String(String::from("ok"))
     }
 
     fn perform_search(&mut self, s: Search, hard: bool) {
         // Actually search the Rope for the pattern.
         // This produces the find spans, which record were the pattern hits in the text.
-        // TODO move this if into search_all (something wasn't clonable?).
+
         let found_spans = s.search_all(&self.text);
 
         self.view.set_find_spans(0, self.text.len(), found_spans);
@@ -732,10 +741,10 @@ impl Editor {
 
         if hard {
             // If we are doing a hard update, the user typing an incremental search,
-            // move the selection to the selection to the first occurance of the pattern
+            // move the selection to the selection to the first occurrence of the pattern
             // after the *start* of the currently selection.
-            // If the user types the next char, this dose not *move* the selection,
-            // but extends it.
+            // If the user types the next char in the document,
+            // then this dose not *move* the selection, but extends it.
             let start = self.view.sel_start;
             self.sel_find_forward_from(start);
         }
@@ -744,45 +753,49 @@ impl Editor {
         self.render(); // XXX for some callers not others.
     }
 
-    fn select_find(&mut self, new_sel: Option<(usize,usize)>) {
+    /// Internal - select the given range because we found the pattern there.
+    fn select_find_range(&mut self, new_sel: Option<(usize,usize)>) {
         if let Some((new_sel_start, new_sel_end)) = new_sel {
             self.set_cursor(new_sel_start, true);
             self.modify_selection();
             self.set_cursor(new_sel_end, true);
-            self.view.sel_is_find = true
+            // Some frontends may want to know that the current sel resulted from a search.
+            self.view.sel_is_find = true;
         }
     }
 
-    fn sel_find_forward_from(&mut self, start: usize) {
-        let mut new_sel = None;
-
+    /// Internal - make sure that we have looked for the current pattern in this buffer.
+    fn refresh_search_results(&mut self) {
         match self.view.find_spans {
-            None => {
+            None => {   // None => we don't know what the current hits would be.
                 if let Some(curr_search) = self.tab_ctx.get_search() {
                     self.perform_search(curr_search, false)
                 }
             },
             _ => ()
         }
-
-        if let Some(ref mut find_spans) = self.view.find_spans {
-            for (i, _) in find_spans.iter() {
-                if start==i.start() || i.is_after(start) {
-                    new_sel = Some((i.start(), i.end()));
-                    break
-                }
-            }
-        }
-        self.select_find(new_sel)
     }
 
+    fn sel_find_forward_from(&mut self, start: usize) {
+        let mut new_sel = None;
+
+        self.refresh_search_results();
+
+        if let Some(ref mut find_spans) = self.view.find_spans {
+            if let Some((i, _)) = find_spans.subseq(Interval::new_closed_open(start, self.text.len())).iter().next() {
+                new_sel = Some((i.start()+start, i.end()+start));
+            }
+        }
+        self.select_find_range(new_sel)
+    }
+
+    /// Select the next find hit after the end of current selection.
     fn sel_find_forward(&mut self) {
         let start = self.view.sel_end;
         self.sel_find_forward_from(start)
     }
 
-
-    // hmm not working
+    /// Select the next find hit not before the start of the current selection.
     fn sel_find_curr(&mut self) {
         let start = self.view.sel_start;
         let mut new_sel = None;
@@ -797,9 +810,9 @@ impl Editor {
                 break
             }
         }}
-        self.select_find(new_sel)
+        self.select_find_range(new_sel)
     }
-
+    /// Select the previous find hit before the start of current selection.
     fn sel_find_backward(&mut self) {
         let mut new_sel = None;
         if let Some(ref mut find_spans) = self.view.find_spans {
@@ -811,9 +824,10 @@ impl Editor {
                 break
             }
         }}
-        self.select_find(new_sel)
+        self.select_find_range(new_sel)
     }
 
+    /// called from rpc - select a search hit.
     fn sel_find(&mut self, flags: u64) {
         match flags {
             0 => self.sel_find_curr(),

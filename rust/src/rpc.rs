@@ -248,10 +248,6 @@ impl<'a> EditCommand<'a> {
                 })
             }).ok_or_else(|| MalformedEditParams(method.to_string(), params.clone())),
 
-
-            "sel_find_next" => Ok(FindNext),
-            "sel_find_prev" => Ok(FindPrev),
-
             _ => Err(UnknownEditMethod(method.to_string())),
         }
     }
