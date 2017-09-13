@@ -34,64 +34,93 @@ versions.
 
 These are mostly described by example rather than specified in detail.
 They are given in shorthand, eliding the JSON-RPC boilerplate. For
-example, the actual interaction on the wire for `new_tab` is:
+example, the actual interaction on the wire for `new_view` is:
 
 ```
-to core: {"id":0,"method":"new_tab","params":[]}
-from core: {"id":0,"result":"1"}
+to core: {"id":0,"method":"new_view","params":{}}
+from core: {"id":0,"result": "view-id-1"}
 ```
 
 ## Top-level methods served by back-end
 
-### new_tab
+### new_view
 
-`new_tab []` -> `"1"`
+`new_view { "file_path": "path.md"? }` -> `"view-id-1"`
 
-Creates a new tab, returning the tab name as a string (currently
-a number, but tab names derived from filenames might be more
-debug-friendly).
+Creates a new view, returning the view identifier as a string.
+`file_path` is optional; if specified, the file is loaded into a new
+buffer; if not a new empty buffer is created. Currently, only a
+single view into a given file can be open at a time.
 
-### delete_tab
+**Note**, there is currently no mechanism for reporting errors. Also
+note, the protocol delegates power to load and save arbitrary files.
+Thus, exposing the protocol to any other agent than a front-end in
+direct control should be done with extreme caution.
 
-`delete_tab {"tab": "1"}`
+### close_view
 
-Deletes a tab, which was created by `new_tab`.
+`close_view {"view_id": "view-id-1"}`
 
-`edit {"method": "insert", "params": {"chars": "A"}, tab: "0"}`
+Closes the view associated with this `view_id`.
+
+### save
+
+`save {"view_id": "view-id-4", "file_path": "save.txt"}`
+
+Saves the buffer associated with `view_id` to `file_path`. See the
+note for `new_view`. Errors are not currently reported.
+
+### set_theme
+
+`set_theme {"theme_name": "InspiredGitHub"}`
+
+Requests that core change the theme. If the change succeeds the client
+will receive a `theme_changed` notification.
+
+### plugin
+**Note:** plugin commands are in flux, and may change.
+
+`plugin {"method": "start", params: {"view_id": "view-id-1", plugin_name: "syntect"}}`
+
+Dispatches the inner method to the plugin manager.
+
+### Plugin methods
+
+#### start
+
+`start {"view_id": "view-id-1", "plugin_name": "syntect"}`
+
+Starts the named given for the given view.
+
+
+#### stop
+
+`stop {"view_id": "view-id-1", "plugin_name": "syntect"}`
+
+Stops the named plugin for the given view.
+
+#### plugin_rpc
+
+```
+plugin_rpc {"view_id": "view-id-1", "receiver": "syntect",
+            "notification": {
+                "method": "custom_method",
+                "params": {"foo": "bar"},
+            }}
+ ```
+
+Sends a custom rpc command to the named receiver. This may be a notification
+or a request.
+
+### edit
+`edit {"method": "insert", "params": {"chars": "A"}, "view_id":
+"view-id-4"}`
 
 Dispatches the inner method to the per-tab handler, with individual
 inner methods described below:
 
+
 ### Edit methods
-
-#### key
-
-`key {"chars":"k","flags":0,"keycode":40}`
-
-**This method is deprecated, use `insert` and individual action
-methods instead.**
-
-Flags are the Cocoa NSEvent modifier flags shifted right 16 bits
-(ie the device independent part). In particular, shift is 2.
-
-Right now, function keys are sent as NS [function key "unicodes"](https://developer.apple.com/library/mac/documentation/Cocoa/Reference/ApplicationKit/Classes/NSEvent_Class/index.html#//apple_ref/doc/constant_group/Function_Key_Unicodes)
-in the 0xF700 range, and are interpreted by the core. **This will
-change, see some of the discussion in pull request #12.** In the
-near future, such functions will get interpreted by the front-end
-and sent as individual commands, generally following the action
-descriptions in [NSResponder](https://developer.apple.com/library/mac/documentation/Cocoa/Reference/ApplicationKit/Classes/NSResponder_Class/),
-such as "deleteBackward" and "pageDown".
-
-Further, there will be full support for input methods, which among
-other things will support emoji input (issue #21). I anticipate
-implementing [NSTextInputClient](https://developer.apple.com/library/mac/documentation/Cocoa/Reference/NSTextInputClient_Protocol/)
-in the Cocoa front-end. This is quite nontrivial and will require
-lots of messages, and possibly reporting of UTF-16 code unit offsets
-through the protocol. A UTF-16 counting metric will likely be added
-to the rope to support this.
-
-But sending uninterpreted keys was a good simple starting point to
-get something working quickly.
 
 #### insert
 
@@ -99,21 +128,6 @@ get something working quickly.
 
 Inserts the `chars` string at the current cursor location.
 
-#### open
-
-`open {filename:"/Users/raph/xi-editor/rust/src/editor.rs"}`
-
-Directs the back-end to open the named file. Note, there is currently
-no mechanism for reporting errors. Also note, the protocol delegates
-power to load and save arbitrary files. Thus, exposing the protocol
-to any other agent than a front-end in direct control should be done
-with extreme caution.
-
-#### save
-
-`save {filename:"/Users/raph/xi-editor/rust/src/editor.rs"}`
-
-Similar to `open`.
 
 #### scroll
 
@@ -140,11 +154,24 @@ click count.
 Implements dragging (extending a selection). Arguments are line,
 column, and flag as in `click`.
 
+#### gesture
+
+`gesture {"line": 42, "col": 31, "ty": "toggle_sel"}`
+
+Note: both `click` and `drag` functionality will be migrated to
+additional `ty` options for `gesture`. For now, "toggle_sel" is the
+only supported option, and has the semantics of toggling one cursor
+in the selection (the usual mapping of Command-click in macOS
+front-ends).
+
 The following edit methods take no parameters, and have similar
-meanings as NSView actions. This list is expected to grow.
+meanings as NSView actions. The pure movement and selection
+modification methods will be migrated to a more general method
+that takes a "movement" enum as a parameter.
 
 ```
 delete_backward
+delete_forward
 insert_newline
 move_up
 move_up_and_modify_selection
@@ -165,6 +192,8 @@ page_down_and_modify_selection
 ### From back-end to front-end
 
 #### update
+**Note**: This document is not entirely up to date: some changes to
+the protocol are described in [this document](https://github.com/google/xi-editor/blob/master/doc/update.md).
 
 ```
 update {"tab": "1", "update": {
@@ -209,6 +238,87 @@ contents may have been invalidated and need to be redrawn. The
 evolution of this method will probably include finer grained
 invalidation (including motion of just the cursor), but will broadly
 follow the existing pattern.
+
+#### theme_changed
+
+`theme_changed {"name": "InspiredGitHub", "theme": Theme}`
+
+Notifies the client that the theme has been changed. The client should
+use the new theme to set colors as appropriate. The `Theme` object is
+directly serialized from a [`syntect::highlighting::ThemeSettings`](https://github.com/trishume/syntect/blob/master/src/highlighting/theme.rs#L27)
+instance.
+
+### plugins
+
+#### available_plugins
+
+`available_plugins {"view_id": "view-id-1", "plugins": [{"name": "syntect",
+"running": true]}`
+
+Notifies the client of the plugins available to the given view.
+
+#### plugin_started
+
+`plugin_started {"view_id": "view-id-1", "plugin": "syntect"}`
+
+Notifies the client that the named plugin is running.
+
+#### plugin_stopped
+
+`plugin_stopped {"view_id": "view-id-1", "plugin": "syntect", "code" 101}`
+
+Notifies the client that the named plugin has stopped. The `code` field is an
+integer exit code; currently 0 indicates a user-initiated exit and 1 indicates
+an abnormal exit, i.e. a plugin crash.
+
+#### update_cmds
+
+`update_cmds {"view_id": "view-id-1", "plugin", "syntect", "cmds": [Command]}`
+
+Notifies the client of a change in the available commands for a given plugin.
+The `cmds` field is a list of all commands currently available to this plugin.
+Clients should store commands on a per-plugin basis; when the `cmds` argument is
+an empty list it means that this plugin is providing no commands; any previously
+available commands should be disabled.
+
+The format for describing a `Command` is in flux. The best place to look for
+a working example is in the tests in core-lib/src/plugins/manifest.rs. As of
+this writing, the following is valid json for a `Command` object:
+
+```json
+    {
+        "title": "Test Command",
+        "description": "Passes the current test",
+        "rpc_cmd": {
+            "rpc_type": "notification",
+            "method": "test.cmd",
+            "params": {
+                "view": "",
+                "non_arg": "plugin supplied value",
+                "arg_one": "",
+                "arg_two": ""
+            }
+        },
+        "args": [
+            {
+                "title": "First argument",
+                "description": "Indicates something",
+                "key": "arg_one",
+                "arg_type": "Bool"
+            },
+            {
+                "title": "Favourite Number",
+                "description": "A number used in a test.",
+                "key": "arg_two",
+                "arg_type": "Choice",
+                "options": [
+                    {"title": "Five", "value": 5},
+                    {"title": "Ten", "value": 10}
+                ]
+            }
+        ]
+    }
+```
 
 ### RPCs from front-end to back-end
 

@@ -14,14 +14,23 @@
 
 //! A rope data structure suitable for text editing
 
+extern crate bytecount;
+extern crate memchr;
+extern crate serde;
+#[macro_use] extern crate serde_derive;
+#[cfg(test)] extern crate serde_test;
+
 pub mod tree;
 pub mod breaks;
 pub mod interval;
 pub mod delta;
 pub mod rope;
 pub mod spans;
-pub mod subset;
+pub mod multiset;
 pub mod engine;
+pub mod find;
+#[cfg(test)]
+mod test_helpers;
 
 // TODO: "pub use" the types we want to export publicly
 
@@ -41,12 +50,6 @@ const MIN_LEAF: usize = 511;
 const MAX_LEAF: usize = 1024;
 const MIN_CHILDREN: usize = 4;
 const MAX_CHILDREN: usize = 8;
-
-// TODO: probably will be stabilized in Rust std lib
-// Note, this isn't exactly the same, it panics when index > s.len()
-fn is_char_boundary(s: &str, index: usize) -> bool {
-    index == s.len() || (s.as_bytes()[index] & 0xc0) != 0x80
-}
 
 /// A rope data structure.
 ///
@@ -130,9 +133,8 @@ impl Debug for Rope {
 }
 */
 
-// TODO: explore ways to make this faster - SIMD would be a big win
 fn count_newlines(s: &str) -> usize {
-    s.as_bytes().iter().filter(|&&c| c == b'\n').count()
+    bytecount::count(s.as_bytes(), b'\n')
 }
 
 impl Rope {
@@ -414,7 +416,7 @@ impl Node {
     fn height(&self) -> usize {
         self.0.height
     }
-    
+
     fn is_leaf(&self) -> bool {
         self.0.height == 0
     }
@@ -449,7 +451,7 @@ impl Node {
             NodeVal::Internal(ref pieces) => (pieces.len() >= MIN_CHILDREN)
         }
     }
- 
+
     fn from_string_piece(s: String) -> Node {
         debug_assert!(s.len() <= MAX_LEAF);
 
@@ -783,7 +785,7 @@ impl Node {
 
         let (s, try_offset) = self.leaf_at(offset - 1);
         let mut len = 1;
-        while !is_char_boundary(s, try_offset + 1 - len) {
+        while !s.is_char_boundary(try_offset + 1 - len) {
             len += 1;
         }
         offset - len
@@ -822,7 +824,7 @@ fn find_leaf_split(s: &str, minsplit: usize) -> usize {
     match s.as_bytes()[minsplit - 1..splitpoint].iter().rposition(|&c| c == b'\n') {
         Some(pos) => minsplit + pos,
         None => {
-            while !is_char_boundary(s, splitpoint) {
+            while !s.is_char_boundary(splitpoint) {
                 splitpoint -= 1;
             }
             splitpoint

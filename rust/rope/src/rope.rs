@@ -19,9 +19,16 @@ use std::cmp::{min,max};
 use std::borrow::Cow;
 use std::str::FromStr;
 use std::string::ParseError;
+use std::fmt;
+use std::str;
 
 use tree::{Leaf, Node, NodeInfo, Metric, TreeBuilder, Cursor};
 use interval::Interval;
+
+use bytecount;
+use memchr::memchr;
+use serde::ser::{Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer};
 
 const MIN_LEAF: usize = 511;
 const MAX_LEAF: usize = 1024;
@@ -98,7 +105,7 @@ impl Metric<RopeInfo> for BaseMetric {
     }
 
     fn is_boundary(s: &String, offset: usize) -> bool {
-        is_char_boundary(s, offset)
+        s.is_char_boundary(offset)
     }
 
     fn prev(s: &String, offset: usize) -> Option<usize> {
@@ -108,7 +115,7 @@ impl Metric<RopeInfo> for BaseMetric {
             None
         } else {
             let mut len = 1;
-            while !is_char_boundary(s, offset - len) {
+            while !s.is_char_boundary(offset - len) {
                 len += 1;
             }
             Some(offset - len)
@@ -122,18 +129,21 @@ impl Metric<RopeInfo> for BaseMetric {
             None
         } else {
             let b = s.as_bytes()[offset];
-            let len = match b {
-                b if b < 0x80 => 1,
-                b if b < 0xe0 => 2,
-                b if b < 0xf0 => 3,
-                _ => 4
-            };
-            Some(offset + len)
+            Some(offset + len_utf8_from_first_byte(b))
         }
     }
 
     fn can_fragment() -> bool {
         false
+    }
+}
+
+pub fn len_utf8_from_first_byte(b: u8) -> usize {
+    match b {
+        b if b < 0x80 => 1,
+        b if b < 0xe0 => 2,
+        b if b < 0xf0 => 3,
+        _ => 4
     }
 }
 
@@ -184,22 +194,8 @@ impl Metric<RopeInfo> for LinesMetric {
 
 // Low level functions
 
-// TODO: use burntsushi memchr
-pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
-    haystack.iter().position(|&b| b == needle)
-}
-
-// TODO: explore ways to make this faster - SIMD would be a big win
-// memchr is probably best for now
 fn count_newlines(s: &str) -> usize {
-    s.as_bytes().iter().filter(|&&c| c == b'\n').count()
-}
-
-// TODO: probably will be stabilized in Rust std lib
-// Note, this isn't exactly the same, it panics when index > s.len()
-fn is_char_boundary(s: &str, index: usize) -> bool {
-    // fancy bit magic for ranges 0..0x80 | 0xc0..
-    index == s.len() || (s.as_bytes()[index] as i8) >= -0x40
+    bytecount::count(s.as_bytes(), b'\n')
 }
 
 fn find_leaf_split_for_bulk(s: &str) -> usize {
@@ -216,7 +212,7 @@ fn find_leaf_split(s: &str, minsplit: usize) -> usize {
     match s.as_bytes()[minsplit - 1..splitpoint].iter().rposition(|&c| c == b'\n') {
         Some(pos) => minsplit + pos,
         None => {
-            while !is_char_boundary(s, splitpoint) {
+            while !s.is_char_boundary(splitpoint) {
                 splitpoint -= 1;
             }
             splitpoint
@@ -232,6 +228,23 @@ impl FromStr for Rope {
         let mut b = TreeBuilder::new();
         b.push_str(s);
         Ok(b.build())
+    }
+}
+
+impl Serialize for Rope {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        serializer.serialize_str(&String::from(self))
+    }
+}
+
+impl<'de> Deserialize<'de> for Rope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Rope::from(s))
     }
 }
 
@@ -422,9 +435,30 @@ impl<'a> From<&'a Rope> for String {
     }
 }
 
+impl fmt::Debug for Rope {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate() {
+            write!(f, "{}", String::from(self))
+        } else {
+            write!(f, "Rope({:?})", String::from(self))
+        }
+    }
+}
+
 // additional cursor features
 
 impl<'a> Cursor<'a, RopeInfo> {
+    /// Get previous codepoint before cursor position, and advance cursor backwards.
+    pub fn prev_codepoint(&mut self) -> Option<char> {
+        self.prev::<BaseMetric>();
+        if let Some((l, offset)) = self.get_leaf() {
+            l[offset..].chars().next()
+        } else {
+            None
+        }
+    }
+
+    /// Get next codepoint after cursor position, and advance cursor.
     pub fn next_codepoint(&mut self) -> Option<char> {
         if let Some((l, offset)) = self.get_leaf() {
             self.next::<BaseMetric>();
@@ -516,6 +550,7 @@ impl<'a> Iterator for Lines<'a> {
 #[cfg(test)]
 mod tests {
     use rope::Rope;
+    use serde_test::{Token, assert_tokens};
 
     #[test]
     fn replace_small() {
@@ -558,4 +593,17 @@ mod tests {
         */
     }
 
+    #[test]
+    fn test_ser_de() {
+        let rope = Rope::from("a\u{00A1}\u{4E00}\u{1F4A9}");
+        assert_tokens(&rope, &[
+            Token::Str("a\u{00A1}\u{4E00}\u{1F4A9}"),
+        ]);
+        assert_tokens(&rope, &[
+            Token::String("a\u{00A1}\u{4E00}\u{1F4A9}"),
+        ]);
+        assert_tokens(&rope, &[
+            Token::BorrowedStr("a\u{00A1}\u{4E00}\u{1F4A9}"),
+        ]);
+    }
 }
