@@ -3,11 +3,14 @@
   <a href="https://github.com/google/xi-editor">Xi Editor</a>
 </h1>
 
+<p align="center"><em>(pronounced "Zigh")</em></p>
+
 <h4 align="center">A modern editor with a backend written in Rust.</h4>
 
 The xi editor project is an attempt to build a high quality text editor,
 using modern software engineering techniques. It is initially built for
-Mac OS X, using Cocoa for the user interface, but other targets are planned.
+Mac OS X, using Cocoa for the user interface. There are also frontends for
+other operating systems available from third-party developers.
 
 Goals include:
 
@@ -24,42 +27,65 @@ Goals include:
 * ***Developer friendliness***. It should be easy to customize xi editor, whether
   by adding plug-ins or hacking on the core.
 
+Please refer to the [November 2017 roadmap](https://github.com/google/xi-editor/issues/437)
+to learn more about planned features.
+
 Screenshot (will need to be updated as syntax coloring and UI polish is added):
 
-![xi screenshot](/doc/img/xi-mac-screenshot.png?raw=true)
+![xi screenshot](/docs/docs/img/xi-mac-screenshot.png?raw=true)
 
 ## Getting started
-You need [Xcode 7.3](https://developer.apple.com/xcode/) (only on Mac) and [Rust](https://www.rust-lang.org/) (version 1.10+ is
-recommended and supported). You should have `cargo` in your path.
 
-```
-> git clone https://github.com/google/xi-editor
-> cd xi-editor
-> xcodebuild
-> open build/Release/XiEditor.app
-```
-
-Or `open XiEditor.xcodeproj` and hit the Run button.
-
-It will look better if you have
-[InconsolataGo](http://levien.com/type/myfonts/inconsolata.html) installed, a
-customized version of Inconsolata tuned for code editing. You can change fonts
-per window in the Font menu or with `Cmd-T`. To choose another default font,
-edit the `CTFontCreateWithName()` call in EditView.swift.
+This repository is the core only. You'll also need a front-end, from the list
+below.
 
 ### Building the core
 
-If you’re not on a Mac, you can build just the core like so:
+Xi targets 'recent stable Rust'. We recommend installing via [rustup](https://www.rustup.rs).
+The current minimum supported version is 1.28.
+
+To build the xi editor from the root directory of this repo:
 
 ```
 > cd rust
 > cargo build
 ```
 
-See the [xi_glium](https://github.com/potocpav/xi_glium) project for an
-experimental front-end in Rust. There are notes (I wouldn’t call it
+Here are some other front-ends in various stages of development:
+
+* [xi-mac](https://github.com/google/xi-mac), the official macOS front-end.
+
+* [fuchsia/xi](https://fuchsia.googlesource.com/topaz/+/master/bin/xi/), a front-end in Flutter for Fuchsia,
+and might work on other Flutter targets.
+
+* [xi-gtk](https://github.com/eyelash/xi-gtk), a GTK+ front-end.
+
+* [xi-term](https://github.com/xi-frontend/xi-term), a text UI.
+
+* [xi-electron](https://github.com/acheronfail/xi-electron), a cross-platform front-end based on web-technologies.
+
+* [gxi](https://github.com/bvinc/gxi), a GTK+ front-end written in Rust.
+
+* [xi-win](https://github.com/google/xi-win), an experimental Windows front-end written in Rust.
+
+* [kod](https://github.com/linde12/kod), a terminal frontend written in Golang.
+
+* [xi-qt](https://github.com/sw5cc/xi-qt), a Qt front-end.
+
+The following are currently inactive, based on earlier versions of the front-end
+protocol, but perhaps could be revitalized:
+
+* [xi_glium](https://github.com/potocpav/xi_glium), an
+experimental GL-based front-end in Rust.
+
+* [XiEditorVS2015](https://github.com/Sineaggi/XiEditorVS2015), C#.
+
+* [xi-android](https://github.com/adrientetar/xi-android), an Android frontend.
+
+There are notes (I wouldn’t call it
 documentation at this point) on the protocol at
-[frontend.md](doc/frontend.md).
+[frontend.md](https://xi-editor.github.io/xi-editor/docs/frontend-protocol.html). If you're working on a front-end, feel free to
+send a PR to add it to the above list.
 
 ## Design decisions
 
@@ -110,10 +136,9 @@ contribute to the above goals:
 
 This is still a project in its early stages. The Mac build has basic editing
 functionality (it was used to write this README), but looks very spare and
-is still missing essentials such as syntax highlighting and auto-indent. At
-the moment, it’s expected that its main community will be developers
-interested in hacking on a text editor.
-
+is still missing essentials such as auto-indent. At the moment, it’s expected
+that its main community will be developers interested in hacking on a text
+editor.
 
 ## Authors
 
@@ -124,6 +149,10 @@ The main author is Raph Levien.
 We gladly accept contributions via GitHub pull requests, as long as the author
 has signed the Google Contributor License. Please see
 [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+
+If you are interested in contributing but not sure where to start, there is
+an active IRC channel at #xi on irc.mozilla.org. There is also a subreddit at
+[/r/xi_editor](https://www.reddit.com/r/xi_editor/).
 
 ### Disclaimer
 

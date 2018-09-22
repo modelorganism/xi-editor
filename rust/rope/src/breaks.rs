@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All rights reserved.
+// Copyright 2016 The xi-editor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ impl Leaf for BreaksLeaf {
     }
 
     fn push_maybe_split(&mut self, other: &BreaksLeaf, iv: Interval) -> Option<BreaksLeaf> {
-        //print_err!("push_maybe_split {:?} {:?} {}", self, other, iv);
+        //eprintln!("push_maybe_split {:?} {:?} {}", self, other, iv);
         let (start, end) = iv.start_end();
         let start_test = if iv.is_start_closed() { start } else { start + 1 };
         for &v in &other.data {
@@ -193,7 +193,7 @@ impl Breaks {
     // other use cases, use the builder.
     pub fn new_no_break(len: usize) -> Breaks {
         let leaf = BreaksLeaf {
-            len: len,
+            len,
             data: vec![],
         };
         Node::from_leaf(leaf)

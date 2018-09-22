@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2016 Google Inc. All rights reserved.
+# Copyright 2016 The xi-editor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ def mk_linebreak_props(datadir):
     gen_table('LINEBREAK_4_LEAVES', 'u8', leaves4);
 
 def mk_tables(datadir):
-    print """// Copyright 2016 Google Inc. All rights reserved.
+    print """// Copyright 2016 The xi-editor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -349,10 +349,15 @@ def mk_lb_rules():
             R = linebreak_assignments[right]
             R = resolve_ambig(R)
             r_with_cm = right
-            if R == 'CM' and L in ['BK', 'CR', 'LF', 'NL', 'SP', 'ZW']:
+            l_with_cm = left
+            if R in ['CM', 'ZWJ'] and L in ['BK', 'CR', 'LF', 'NL', 'SP', 'ZW']:
                 # handling for LB10
                 r_with_cm = 2  # AL
                 bk = t[L + '|' + 'AL']
+            elif L == 'ZWJ' and R not in ['ID', 'EB', 'EM']:
+                #handling for LB10
+                l_with_cm = 2  # AL
+                bk = t['AL' + '|' + R]
             else:
                 bk = t[L + '|' + R]
             flags = bk_to_flags[bk]
@@ -367,12 +372,12 @@ def mk_lb_rules():
             elif flags == 0 and L == 'HL' and R == 'BA':
                 # special state for LB21a
                 state = n + 1
-            elif R == 'CM' and L not in ['BK', 'CR', 'LF', 'NL', 'SP', 'ZW']:
+            elif R in ['CM', 'ZWJ'] and L not in ['BK', 'CR', 'LF', 'NL', 'SP', 'ZW']:
                 # handling for LB9
-                state = left
+                state = l_with_cm
             elif flags == 0 and R == 'RI' and L == 'RI':
                 # handling for LB31
-                state = n + 2;
+                state = n + 2
             else:
                 state = flags + r_with_cm
             #print '//', L, R, bk, state

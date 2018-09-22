@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All rights reserved.
+// Copyright 2016 The xi-editor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,89 +11,59 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-extern crate serde;
-extern crate serde_json;
-extern crate time;
-
 use std::io;
 
-use serde_json::Value;
-
 #[macro_use]
-mod macros;
+extern crate log;
+extern crate chrono;
+extern crate fern;
 
-mod tabs;
-mod editor;
-mod view;
-mod linewrap;
-mod rpc;
-mod run_plugin;
-
-use tabs::Tabs;
-use rpc::Request;
-
-extern crate xi_rope;
-extern crate xi_unicode;
+extern crate xi_core_lib;
 extern crate xi_rpc;
 
-use xi_rpc::{RpcLoop, RpcPeer, RpcCtx, Handler};
+use xi_core_lib::XiCore;
+use xi_rpc::RpcLoop;
 
-type W = io::Stdout;
-pub type MainPeer = RpcPeer<io::Stdout>;
+fn setup_logging() -> Result<(), fern::InitError> {
+    let level_filter = match std::env::var("XI_LOG") {
+        Ok(level) => match level.to_lowercase().as_ref() {
+            "trace" => log::LevelFilter::Trace,
+            "debug" => log::LevelFilter::Debug,
+            _ => log::LevelFilter::Info,
+        },
+        // Default to info
+        Err(_) => log::LevelFilter::Info
+    };
 
-struct MainState {
-    tabs: Tabs,
-}
-
-impl MainState {
-    fn new() -> Self {
-        MainState {
-            tabs: Tabs::new(),
-        }
-    }
-}
-
-impl Handler<W> for MainState {
-    fn handle_notification(&mut self, ctx: RpcCtx<W>, method: &str, params: &Value) {
-        match Request::from_json(method, params) {
-            Ok(req) => {
-                let _ = self.handle_req(req, ctx.get_peer());
-                // TODO: should check None
-            }
-            Err(e) => print_err!("Error {} decoding RPC request {}", e, method)
-        }
-    }
-
-    fn handle_request(&mut self, ctx: RpcCtx<W>, method: &str, params: &Value) ->
-        Result<Value, Value> {
-        match Request::from_json(method, params) {
-            Ok(req) => {
-                let result = self.handle_req(req, ctx.get_peer());
-                result.ok_or_else(|| Value::String("return value missing".to_string()))
-            }
-            Err(e) => {
-                print_err!("Error {} decoding RPC request {}", e, method);
-                Err(Value::String("error decoding request".to_string()))
-            }
-        }
-    }
-}
-
-impl MainState {
-    fn handle_req(&mut self, request: Request, rpc_peer: &MainPeer) ->
-        Option<Value> {
-        match request {
-            Request::TabCommand { tab_command } => self.tabs.do_rpc(tab_command, rpc_peer)
-        }
-    }
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(level_filter)
+        .chain(std::io::stderr())
+        .chain(fern::log_file("xi-core.log")?)
+        .apply()?;
+    Ok(())
 }
 
 fn main() {
-    let mut state = MainState::new();
+    let mut state = XiCore::new();
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut rpc_looper = RpcLoop::new(stdout);
 
-    rpc_looper.mainloop(|| stdin.lock(), &mut state);
+    if let Err(e) = setup_logging() {
+        eprintln!("[ERROR] setup_logging returned error, logging disabled: {:?}", e);
+    }
+
+    match rpc_looper.mainloop(|| stdin.lock(), &mut state) {
+        Ok(_) => (),
+        Err(err) => error!("xi-core exited with error:\n{:?}", err),
+    }
 }

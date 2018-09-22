@@ -1,4 +1,4 @@
-// Copyright 2016 Google Inc. All rights reserved.
+// Copyright 2016 The xi-editor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ impl Interval {
         let start = (start as u64) * 2 + if start_closed { 0 } else { 1 };
         let end = (end as u64) * 2 + if end_closed { 1 } else { 0 };
         Interval {
-            start: start,
+            start,
             end: max(start, end),
         }
     }
@@ -126,7 +126,7 @@ impl Interval {
         let start = max(self.start, other.start);
         let end = min(self.end, other.end);
         Interval {
-            start: start,
+            start,
             end: max(start, end),
         }
     }
@@ -139,8 +139,8 @@ impl Interval {
         let start = min(self.start, other.start);
         let end = max(self.end, other.end);
         Interval {
-            start: start,
-            end: end,
+            start,
+            end,
         }
     }
 
